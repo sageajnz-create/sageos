@@ -1,0 +1,123 @@
+#!/usr/bin/bash
+# sageos-doctor — automated health check for a SageOS install.
+# Machine-checkable subset of docs/phase*-validation.md. Run via
+# `ujust sageos-doctor` (or directly). Exit 0 = no failures (warnings OK).
+#
+# WARN vs FAIL: things that are expected to differ in a VM or before first
+# network-connected boot are warnings, so the doctor is useful everywhere.
+
+set -uo pipefail
+
+pass=0 fail=0 warn=0
+
+ok()   { printf '  \033[32mPASS\033[0m  %s\n' "$1"; pass=$((pass+1)); }
+bad()  { printf '  \033[31mFAIL\033[0m  %s\n' "$1"; fail=$((fail+1)); }
+note() { printf '  \033[33mWARN\033[0m  %s\n' "$1"; warn=$((warn+1)); }
+
+section() { printf '\n\033[1m-- %s --\033[0m\n' "$1"; }
+
+echo "== SageOS doctor =="
+
+section "Image identity"
+if grep -qs "NAME=SageOS" /etc/sageos-release; then
+    ok "/etc/sageos-release present"
+else
+    bad "/etc/sageos-release missing — not a SageOS image?"
+fi
+booted="$(rpm-ostree status --booted 2>/dev/null || true)"
+if grep -qi "sageos" <<<"${booted}"; then
+    ok "booted deployment is a SageOS image"
+elif [[ -n "${booted}" ]]; then
+    note "booted deployment is not SageOS (stock base? pre-rebase?)"
+else
+    note "rpm-ostree status unavailable (container/chroot?)"
+fi
+
+section "Graphics"
+if command -v vulkaninfo >/dev/null; then
+    vk="$(vulkaninfo --summary 2>/dev/null || true)"
+    if grep -qi "radv" <<<"${vk}"; then
+        ok "Vulkan: RADV active"
+    elif grep -qi "llvmpipe" <<<"${vk}"; then
+        note "Vulkan: llvmpipe software renderer (VM or driver problem)"
+    else
+        note "Vulkan: no RADV device reported"
+    fi
+else
+    bad "vulkaninfo not installed (should be layered in image)"
+fi
+if command -v glxinfo >/dev/null; then
+    gl="$(glxinfo -B 2>/dev/null || true)"
+    if grep -qi "radeonsi" <<<"${gl}"; then
+        ok "OpenGL: radeonsi active"
+    elif grep -qi "llvmpipe" <<<"${gl}"; then
+        note "OpenGL: llvmpipe software renderer (VM or driver problem)"
+    else
+        note "OpenGL: renderer not radeonsi (no display session?)"
+    fi
+else
+    bad "glxinfo not installed (should be layered in image)"
+fi
+if command -v vainfo >/dev/null; then
+    if vainfo 2>/dev/null | grep -q "VAEntrypoint"; then
+        ok "VA-API: decode entrypoints present"
+    else
+        note "VA-API: no entrypoints (VM, or missing display session)"
+    fi
+else
+    bad "vainfo not installed (should be layered in image)"
+fi
+if [[ "${XDG_SESSION_TYPE:-}" == "wayland" ]]; then
+    ok "session is Wayland"
+elif [[ -n "${XDG_SESSION_TYPE:-}" ]]; then
+    note "session is ${XDG_SESSION_TYPE}, expected wayland"
+else
+    note "no graphical session detected (running from tty/ssh?)"
+fi
+
+section "Audio"
+if command -v wpctl >/dev/null && wpctl status &>/dev/null; then
+    if wpctl status 2>/dev/null | grep -qE "^\s*\*"; then
+        ok "PipeWire: graph up, default device set"
+    else
+        note "PipeWire: running but no default device marked"
+    fi
+else
+    note "PipeWire/wpctl not reachable (no user session?)"
+fi
+
+section "Gaming stack"
+command -v steam     >/dev/null && ok "Steam present (native)"      || bad "Steam missing from image"
+command -v gamemoded >/dev/null && ok "GameMode present (native)"   || bad "GameMode missing from image"
+command -v gamescope >/dev/null && ok "gamescope present (native)"  || note "gamescope not found"
+command -v mangohud  >/dev/null && ok "MangoHud present"            || note "MangoHud CLI not in PATH (flatpak layer may still work)"
+
+section "Flatpaks"
+if flatpak remotes --system 2>/dev/null | grep -q flathub; then
+    ok "Flathub remote configured"
+else
+    bad "Flathub remote missing"
+fi
+if systemctl is-enabled sageos-flatpak-setup.service &>/dev/null; then
+    ok "sageos-flatpak-setup enabled"
+else
+    bad "sageos-flatpak-setup not enabled"
+fi
+if [[ -f /etc/sageos/flatpak_setup_version ]]; then
+    ok "sageos flatpak list applied ($(cut -c1-12 /etc/sageos/flatpak_setup_version))"
+else
+    note "sageos flatpak list not yet applied (first boot pending / no network yet)"
+fi
+for app in com.heroicgameslauncher.hgl net.lutris.Lutris com.usebottles.bottles org.libreoffice.LibreOffice; do
+    if flatpak info --system "${app}" &>/dev/null; then
+        ok "flatpak: ${app}"
+    else
+        note "flatpak not installed yet: ${app}"
+    fi
+done
+
+section "Services"
+systemctl is-enabled podman.socket &>/dev/null && ok "podman.socket enabled" || bad "podman.socket not enabled"
+
+printf '\n\033[1m== Summary: %d passed, %d warnings, %d failed ==\033[0m\n' "${pass}" "${warn}" "${fail}"
+[[ "${fail}" -eq 0 ]]

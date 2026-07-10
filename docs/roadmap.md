@@ -5,7 +5,7 @@
 | 1 | Architecture decision, base distro choice (Bazzite/uBlue bootc image) | ✅ approved 2026-07-10 |
 | 2 | Image pipeline, repo scaffold, installer strategy, base system layout | ✅ 2026-07-10 (pending CI-green confirmation) |
 | 3 | Desktop, input, audio, graphics stack (Plasma/Wayland defaults, VRR/HDR validation, default Flatpaks) | 🔨 built, awaiting hardware validation |
-| 4 | Gaming stack & compatibility layers (Proton-GE, Lutris/Heroic/Bottles, shader cache, per-title notes) | ⬜ |
+| 4 | Gaming stack & compatibility layers (Proton-GE, Lutris/Heroic/Bottles, shader cache, per-title notes) | 🔨 built, awaiting hardware validation |
 | 5 | System services, rollback & update policy (uupd, pinning, signed-image enforcement, virt fallback) | ⬜ |
 | 6 | Performance tuning & polish (branding, boot splash, defaults, latency/scheduler tuning) | ⬜ |
 | 7 | Packaging, release & maintenance (ISO releases, versioned tags, update cadence, docs) | ⬜ |
@@ -38,3 +38,21 @@ hardware and explicit sign-off before the next begins.
   default we maintain.
 - Diagnostics (`vulkaninfo`, `glxinfo`, `vainfo`) are layered into the image
   so validation checklists run on any install without setup.
+
+## Phase 4 decisions (2026-07-10)
+
+- Proton strategy: **no layered Proton**. Official Proton via Steam; GE builds
+  user-managed via ProtonUp-Qt (in base). Layering Proton would couple game
+  compatibility to OS image releases — exactly the wrong cadence.
+- Launchers ship as flatpaks via our list: Heroic, Lutris, Bottles,
+  Protontricks. Steam/GameMode/gamescope/MangoHud confirmed native in the
+  Bazzite base (verified in their Containerfile, not assumed).
+- Virtualization fallback + boot-to-Windows: **already in base** as
+  `ujust setup-virtualization` and `ujust setup-boot-windows-steam` — user-run
+  commands, not image defaults; documented in gaming.md. Phase 5's planned
+  virt RPM layering is cancelled as redundant.
+- SageOS ujust recipes registered via `70-sageos.just` (import appended to the
+  master justfile — Bazzite's own mechanism). First recipes: `sageos-doctor`
+  (automated health check), `sageos-version`.
+- Anti-cheat/per-title truth lives in docs/gaming.md, pointing at
+  areweanticheatyet.com + protondb.com rather than maintaining a static list.

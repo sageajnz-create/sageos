@@ -10,7 +10,10 @@
 # Office (daily-driver requirement; Bazzite ships no office suite)
 org.libreoffice.LibreOffice
 
-# ── Phase 4 candidates (gaming compat launchers) — enable when Phase 4 lands ──
-# com.heroicgameslauncher.hgl
-# net.lutris.Lutris
-# com.usebottles.bottles
+# ── Phase 4: gaming compatibility layers ──
+# Launchers for everything outside Steam. Steam+Proton+GameMode are native in
+# the Bazzite base; Proton-GE is user-managed via ProtonUp-Qt (also in base).
+com.heroicgameslauncher.hgl
+net.lutris.Lutris
+com.usebottles.bottles
+com.github.Matoking.protontricks
