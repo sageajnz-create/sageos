@@ -1,0 +1,3 @@
+# Everything in this repo is consumed on Linux (CI runners, the OS image
+# itself) — force LF so Windows checkouts can't corrupt shell scripts.
+* text=auto eol=lf

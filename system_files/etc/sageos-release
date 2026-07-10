@@ -1,0 +1,3 @@
+NAME=SageOS
+VERSION=0.1.0-phase2
+BASE=bazzite:stable
