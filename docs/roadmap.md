@@ -84,3 +84,8 @@ Issues found and fixed:
 
 Still requires real hardware: RADV/VRR/HDR, audio devices, controllers,
 EAC title, boot-to-Windows, rollback-under-use (phase 1/3/4 checklists).
+
+Post-fix verification (same day): image rebuild green; build-disk run
+29066771454 — **both** qcow2 and anaconda-iso legs green. The SageOS
+installer ISO builds successfully as of this run (still a Phase 7
+deliverable; the recommended install path remains Bazzite ISO → rebase).
