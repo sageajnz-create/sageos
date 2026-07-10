@@ -1,3 +1,18 @@
+# VM disk images (qcow2/raw) for TESTING ONLY — never used by the installer
+# ISO (see iso.toml). The test user + SSH key below exist so CI-built VM
+# images are automatically inspectable (boot → ssh → ujust sageos-doctor).
+# The password is deliberately weak and public: these images must never be
+# deployed to real hardware.
+
 [[customizations.filesystem]]
 mountpoint = "/"
 minsize = "20 GiB"
+
+[[customizations.user]]
+name = "test"
+password = "sageos"
+key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDz3mdKB/GH7dydKeQjjw8oog67xugcMEiTRxSYtU8v0 sageos-vm-test"
+groups = ["wheel"]
+
+[customizations.services]
+enabled = ["sshd"]
