@@ -1,0 +1,17 @@
+[Unit]
+Description=SageOS default flatpaks
+# Order after Bazzite's manager so flathub setup/blocklist are settled first
+Wants=network-online.target
+After=network-online.target bazzite-flatpak-manager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/sageos-flatpak-setup
+# Same pattern as bazzite-flatpak-manager.service: retry until network/flathub
+# cooperate, cheap no-op once the current list version has been applied.
+Restart=on-failure
+RestartSec=60
+StartLimitIntervalSec=0
+
+[Install]
+WantedBy=multi-user.target

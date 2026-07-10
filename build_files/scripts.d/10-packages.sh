@@ -13,7 +13,12 @@
 set -ouex pipefail
 
 dnf5 install -y \
-    tmux
+    tmux \
+    vulkan-tools \
+    glx-utils \
+    libva-utils
+# vulkan-tools/glx-utils/libva-utils: vulkaninfo, glxinfo, vainfo — required
+# by docs/phase*-validation.md checklists; not present in the Bazzite base.
 
 # ── Reserved for later phases (uncomment when the phase lands) ──
 # Phase 4 (gaming extras not already in Bazzite): none expected — Bazzite

@@ -1,0 +1,16 @@
+# SageOS default Flatpaks — ADDITIONS on top of Bazzite's own first-boot set.
+# Bazzite (KDE) already installs: Firefox, Haruna, Okular, Gwenview, KCalc,
+# Filelight, Flatseal, Warehouse, Gear Lever, DistroShelf, ProtonUp-Qt, and
+# the MangoHud / vkBasalt / OBSVkCapture Vulkan layers. Do not duplicate them.
+#
+# One Flathub ref per line; '#' starts a comment. Editing this file changes
+# its hash, which re-triggers sageos-flatpak-setup.service on the next boot
+# after the image update lands.
+
+# Office (daily-driver requirement; Bazzite ships no office suite)
+org.libreoffice.LibreOffice
+
+# ── Phase 4 candidates (gaming compat launchers) — enable when Phase 4 lands ──
+# com.heroicgameslauncher.hgl
+# net.lutris.Lutris
+# com.usebottles.bottles

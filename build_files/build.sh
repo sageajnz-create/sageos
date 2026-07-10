@@ -10,6 +10,10 @@ set -ouex pipefail
 # Overlay static system files from the repo onto the image root
 cp -avf /ctx/system_files/. /
 
+# Executable bits can be lost by Windows checkouts — enforce them here for
+# anything we ship that systemd or users execute directly.
+chmod 0755 /usr/libexec/sageos-* 2>/dev/null || true
+
 # Run build stages in order
 for stage in /ctx/scripts.d/*.sh; do
     echo "==> Running stage: ${stage}"
