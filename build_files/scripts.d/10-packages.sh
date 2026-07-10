@@ -16,7 +16,12 @@ dnf5 install -y \
     tmux \
     vulkan-tools \
     glx-utils \
-    libva-utils
+    libva-utils \
+    gamemode
+# gamemode: absent from the current bazzite:stable digest (verified in a
+# booted VM 2026-07-10 — sageos-doctor FAIL) despite being in Bazzite's
+# Containerfile package list. Layer it until the base ships it again;
+# harmless duplicate if/when it returns.
 # vulkan-tools/glx-utils/libva-utils: vulkaninfo, glxinfo, vainfo — required
 # by docs/phase*-validation.md checklists; not present in the Bazzite base.
 

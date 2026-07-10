@@ -56,3 +56,31 @@ hardware and explicit sign-off before the next begins.
   (automated health check), `sageos-version`.
 - Anti-cheat/per-title truth lives in docs/gaming.md, pointing at
   areweanticheatyet.com + protondb.com rather than maintaining a static list.
+
+## Validation run: 2026-07-10 (QEMU/KVM VM, image from CI build #1)
+
+First boot of SageOS as a running OS. `sageos-doctor`: **10 PASS / 8 WARN /
+1 FAIL** — all WARNs were the expected headless-VM class (llvmpipe, no
+Wayland/audio session, flatpak install still in flight).
+
+Confirmed working: SageOS branding on login banner; booted deployment
+identified as SageOS image; Steam/gamescope/MangoHud native;
+sageos-flatpak-setup service enabled AND observed mid-install over the VM's
+NAT (LibreOffice + Heroic already installed); ujust wiring
+(`ujust sageos-version`); podman.socket; layered diagnostics present.
+
+Issues found and fixed:
+1. `gamemoded` missing from the bazzite:stable digest → layered `gamemode`
+   (scripts.d/10-packages.sh).
+2. anaconda-iso bib depsolve failure root-caused: image ships terra-mesa
+   `enabled=1` (base build intends disabled; a terra-release-mesa update
+   rewrites it) + file:// gpgkey that bib resolves against the *builder*
+   filesystem → scripts.d/15-repo-fixes.sh restores enabled=0.
+3. Template fixes upstreamable: build-disk.yml needed GHCR login (private
+   packages) and explicit `--rootfs btrfs` for Bazzite-based images.
+4. bib `[customizations.services]` (sshd) was NOT honored for the qcow2;
+   user + password + ssh key customizations WERE. VM access path is serial
+   console login (test/sageos) — documented in disk_config/disk.toml.
+
+Still requires real hardware: RADV/VRR/HDR, audio devices, controllers,
+EAC title, boot-to-Windows, rollback-under-use (phase 1/3/4 checklists).
