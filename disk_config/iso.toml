@@ -7,7 +7,7 @@
 [customizations.installer.kickstart]
 contents = """
 %post
-bootc switch --mutate-in-place --transport registry ghcr.io/changeme/sageos:latest
+bootc switch --mutate-in-place --transport registry ghcr.io/sageajnz-create/sageos:latest
 %end
 """
 

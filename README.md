@@ -20,7 +20,7 @@ The entire OS is defined by this repo:
 | `disk_config/` | bootc-image-builder configs for ISO and disk images |
 | `Justfile` | Local build/test recipes (`just build`, `just build-iso`, `just run-vm-qcow2`) |
 
-Every push to `main` publishes `ghcr.io/<you>/sageos:latest`. Installed
+Every push to `main` publishes `ghcr.io/sageajnz-create/sageos:latest`. Installed
 machines update to it atomically and can roll back to the previous image from
 the GRUB menu.
 
@@ -43,7 +43,7 @@ Preferred path while the project is young — install stock Bazzite, then rebase
 
 ```bash
 # on a fresh Bazzite (KDE) install:
-sudo bootc switch ghcr.io/<you>/sageos:latest
+sudo bootc switch ghcr.io/sageajnz-create/sageos:latest
 systemctl reboot
 ```
 

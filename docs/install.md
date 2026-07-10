@@ -31,7 +31,7 @@ stick around to repair boot entries if it happens.
 4. Boot into Bazzite, then rebase to SageOS:
 
    ```bash
-   sudo bootc switch ghcr.io/<you>/sageos:latest
+   sudo bootc switch ghcr.io/sageajnz-create/sageos:latest
    systemctl reboot
    ```
 
