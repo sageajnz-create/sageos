@@ -1,0 +1,52 @@
+#!/usr/bin/bash
+# sageos-pin — keep exactly one pinned, known-good deployment.
+#
+# Runs once per boot (sageos-pin.service): pins whichever deployment is
+# running right now and unpins everything else. The effect is that the
+# system always has one immutable rollback point — the image that booted
+# successfully — no matter how many updates arrive after it. A staged or
+# failed deployment can never evict the last known good from the disk,
+# which is what makes `ujust sageos-rollback` (and greenboot's automatic
+# rollback) trustworthy months down the line.
+#
+# Best-effort by design: any failure leaves ostree's own two-deployment
+# default in place, so this script never makes things worse than not
+# running at all.
+
+set -uo pipefail
+
+command -v rpm-ostree >/dev/null 2>&1 || exit 0
+command -v ostree >/dev/null 2>&1 || exit 0
+
+status="$(rpm-ostree status --json 2>/dev/null)" || exit 0
+export SAGEOS_PIN_STATUS="${status}"
+
+python3 - <<'PYEOF'
+import json, os, subprocess, sys
+
+try:
+    st = json.loads(os.environ["SAGEOS_PIN_STATUS"])
+except Exception:
+    sys.exit(0)
+
+deps = st.get("deployments") or []
+booted = next((i for i, d in enumerate(deps) if d.get("booted")), None)
+if booted is None:
+    sys.exit(0)
+
+
+def pin(args):
+    # Failures are expected when state is already as we want it; ostree's
+    # own two-deployment retention remains the floor either way.
+    subprocess.run(["ostree", "admin", "pin", *args],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+# Unpin everything except the running deployment. Descending order keeps
+# earlier indices valid while entries shift underneath us.
+for i in range(len(deps) - 1, -1, -1):
+    if i != booted:
+        pin(["--unpin", str(i)])
+
+pin([str(booted)])
+PYEOF

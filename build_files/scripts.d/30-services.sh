@@ -10,3 +10,7 @@ systemctl enable podman.socket
 # First-boot/post-update installer for SageOS default flatpaks
 # (unit + script + list live in system_files/)
 systemctl enable sageos-flatpak-setup.service
+
+# Pin each successfully booted deployment so a known-good rollback point
+# always survives on disk (unit + script live in system_files/)
+systemctl enable sageos-pin.service

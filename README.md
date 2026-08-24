@@ -4,7 +4,7 @@ Gaming-first, atomic, daily-driver Linux for x86_64 PCs. Built as a custom
 [bootc](https://bootc-dev.github.io/bootc/) image on top of
 [Bazzite](https://bazzite.gg) (Fedora Atomic + Universal Blue).
 
-**Status: Phase 2 — image pipeline.** See [docs/roadmap.md](docs/roadmap.md).
+**Status: Phase 5 — update policy & rollback.** See [docs/roadmap.md](docs/roadmap.md).
 
 ## How this works
 
@@ -21,8 +21,10 @@ The entire OS is defined by this repo:
 | `Justfile` | Local build/test recipes (`just build`, `just build-iso`, `just run-vm-qcow2`) |
 
 Every push to `main` publishes `ghcr.io/sageajnz-create/sageos:latest`. Installed
-machines update to it atomically and can roll back to the previous image from
-the GRUB menu.
+machines update to it atomically (nightly via `uupd`), verify each update
+against the committed `cosign.pub` key before installing it, and can roll back
+to the previous image from the GRUB menu — the running deployment is pinned at
+every boot, so a known-good fallback is always on disk.
 
 ## One-time setup
 

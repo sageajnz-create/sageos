@@ -6,7 +6,7 @@
 | 2 | Image pipeline, repo scaffold, installer strategy, base system layout | ✅ 2026-07-10 (pending CI-green confirmation) |
 | 3 | Desktop, input, audio, graphics stack (Plasma/Wayland defaults, VRR/HDR validation, default Flatpaks) | 🔨 built, awaiting hardware validation |
 | 4 | Gaming stack & compatibility layers (Proton-GE, Lutris/Heroic/Bottles, shader cache, per-title notes) | 🔨 built, awaiting hardware validation |
-| 5 | System services, rollback & update policy (uupd, pinning, signed-image enforcement, virt fallback) | ⬜ |
+| 5 | System services, rollback & update policy (uupd, pinning, signed-image enforcement, virt fallback) | 🔨 built, awaiting VM validation |
 | 6 | Performance tuning & polish (branding, boot splash, defaults, latency/scheduler tuning) | ⬜ |
 | 7 | Packaging, release & maintenance (ISO releases, versioned tags, update cadence, docs) | ⬜ |
 
@@ -56,6 +56,37 @@ hardware and explicit sign-off before the next begins.
   (automated health check), `sageos-version`.
 - Anti-cheat/per-title truth lives in docs/gaming.md, pointing at
   areweanticheatyet.com + protondb.com rather than maintaining a static list.
+
+## Phase 5 decisions (2026-08-24)
+
+- **Updates stay with uupd.** Verified in the Bazzite Containerfile (not
+  assumed): the desktop build installs uupd, enables `uupd.timer`, disables
+  `rpm-ostreed-automatic.timer`, and sets `AutomaticUpdatePolicy=none` — so the
+  base already has exactly one update path and no double-update race. SageOS
+  adds no config override: Bazzite's defaults (system + flatpak modules,
+  hardware checks on metered/low-power situations) are the policy we would
+  have written anyway, and every default we ship is a default we maintain.
+  Users get `ujust sageos-update` for a manual run of the same thing.
+- **Rollback point guaranteed by pinning.** `sageos-pin.service` runs at every
+  boot and pins the running deployment while unpinning all others, so the disk
+  always holds one immutable known-good image no matter how many updates land
+  after it. Best-effort: any failure falls back to ostree's own two-deployment
+  retention, never below it. Complements greenboot (already enabled in base),
+  which rolls back automatically when boot health checks fail.
+- **Signed-image enforcement via containers policy.** The image now ships
+  `/usr/etc/containers/policy.json` requiring a sigstore signature from our
+  public key (`/usr/etc/pki/containers/cosign.pub`, the repo's cosign.pub)
+  for `ghcr.io/sageajnz-create/sageos`. CI already signs every pushed image
+  with the matching private key, so updates verify end to end; anything else
+  pulled under that ref is rejected. Other registries keep the permissive
+  default — enforcement targets *our* supply chain, not the user's freedom.
+- **Virtualization fallback: cancelled** (ratified in Phase 4). The base ships
+  `ujust setup-virtualization` and `ujust setup-boot-windows-steam`; layering
+  libvirt ourselves was redundant. Phase 5's remaining scope was therefore
+  update policy, pinning and signing only.
+- New recipes: `ujust sageos-update`, `ujust sageos-rollback`. Doctor gained an
+  "Updates & integrity" section covering timer, policy file, pin state and
+  greenboot; checklist in docs/phase5-validation.md.
 
 ## Validation run: 2026-07-10 (QEMU/KVM VM, image from CI build #1)
 

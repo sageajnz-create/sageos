@@ -1,0 +1,14 @@
+[Unit]
+Description=SageOS: pin the running deployment as the rollback point
+Documentation=man:ostree(1)
+# Only meaningful on a booted ostree system, not in containers or chroots.
+ConditionPathExists=/run/ostree-booted
+After=systemd-remount-fs.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/sageos-pin
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

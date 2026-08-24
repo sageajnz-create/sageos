@@ -119,5 +119,57 @@ done
 section "Services"
 systemctl is-enabled podman.socket &>/dev/null && ok "podman.socket enabled" || bad "podman.socket not enabled"
 
+section "Updates & integrity"
+command -v uupd >/dev/null && ok "uupd present" || bad "uupd missing (updates would not run)"
+systemctl is-enabled uupd.timer &>/dev/null && ok "automatic updates armed (uupd.timer)" || bad "uupd.timer not enabled"
+if [[ -f /etc/rpm-ostreed.conf ]] && grep -q "AutomaticUpdatePolicy=none" /etc/rpm-ostreed.conf; then
+    ok "rpm-ostree auto policy none (uupd owns updates, no double-update)"
+else
+    note "rpm-ostreed.conf not set to none — possible double-update path"
+fi
+POLICY="/usr/etc/containers/policy.json"
+KEY="/usr/etc/pki/containers/cosign.pub"
+IMAGE_REF="ghcr.io/sageajnz-create/sageos"
+if [[ -f "${POLICY}" && -f "${KEY}" ]] \
+    && grep -q "sigstoreSigned" "${POLICY}" \
+    && grep -q "${IMAGE_REF}" "${POLICY}"; then
+    ok "image signature enforced for ${IMAGE_REF}"
+else
+    bad "signature policy missing — updates are not verified as ours"
+fi
+if systemctl is-enabled sageos-pin.service &>/dev/null; then
+    if rpm-ostree status --json >/dev/null 2>&1; then
+        export SAGEOS_DOCTOR_STATUS="$(rpm-ostree status --json 2>/dev/null)"
+        pinned="$(python3 - <<'PYEOF'
+import json, os
+try:
+    deps = json.loads(os.environ["SAGEOS_DOCTOR_STATUS"]).get("deployments") or []
+except Exception:
+    print("unknown"); raise SystemExit
+booted = next((d for d in deps if d.get("booted")), None)
+if booted is None:
+    print("unknown")
+elif "pinned" not in booted:
+    print("no-field")  # older rpm-ostree: pin state not reported
+else:
+    print("pinned" if booted["pinned"] else "unpinned")
+PYEOF
+)"
+        case "${pinned}" in
+            pinned)  ok "booted deployment pinned — rollback point guaranteed" ;;
+            unpinned) note "booted deployment not yet pinned (sageos-pin runs at boot)" ;;
+            no-field) note "rpm-ostree too old to report pin state" ;;
+            *)       note "deployment state unreadable (container/chroot?)" ;;
+        esac
+    else
+        note "rpm-ostree status unavailable (container/chroot?)"
+    fi
+else
+    bad "sageos-pin.service not enabled — no guaranteed rollback point"
+fi
+systemctl is-enabled greenboot-healthcheck.service &>/dev/null \
+    && ok "greenboot health checks enabled" \
+    || note "greenboot not enabled (automatic rollback on failed boot unavailable)"
+
 printf '\n\033[1m== Summary: %d passed, %d warnings, %d failed ==\033[0m\n' "${pass}" "${warn}" "${fail}"
 [[ "${fail}" -eq 0 ]]

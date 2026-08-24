@@ -28,6 +28,7 @@ dnf5 install -y \
 # ── Reserved for later phases (uncomment when the phase lands) ──
 # Phase 4 (gaming extras not already in Bazzite): none expected — Bazzite
 #   ships Steam, gamescope, MangoHud, GameMode, vkBasalt already.
-# Phase 5 (virtualization fallback path):
-# dnf5 install -y virt-manager libvirt-daemon-kvm qemu-kvm virtiofsd
-# systemctl enable libvirtd.socket
+# Phase 5 (virtualization fallback): cancelled — `ujust setup-virtualization`
+#   and `ujust setup-boot-windows-steam` are already in the Bazzite base as
+#   user-run commands; layering libvirt ourselves was redundant. See
+#   docs/roadmap.md, Phase 4 decisions.
