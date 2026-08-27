@@ -25,7 +25,7 @@ Run the cheapest level that can catch the change, then every lower level:
 | Level | Command | Purpose |
 |---|---|---|
 | 0 | `just validate` | Just syntax, ShellCheck, offline behavior and image-structure tests |
-| 1 | `just build` | Build and bootc-lint the OCI image |
+| 1 | `just build`, then `just validate-image` | Build, bootc-lint, and contract-test the OCI image |
 | 2 | `just rebuild-qcow2` | Build a fresh bootable VM disk |
 | 3 | `just run-vm-qcow2` | Interactive VM validation and `sageos-doctor` |
 | 4 | Hardware checklist | GPU, audio, controllers, suspend, Windows dual boot |

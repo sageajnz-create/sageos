@@ -101,6 +101,7 @@ bundles while adding GUI previews, validation, migrations, and undo history.
   in `docs/support-policy.md`; stable publication remains a Phase 10 gate)
 - Add a single `just validate` gate and run it in CI.
 - Add container structure tests for files, modes, services, policy, and ujust.
+  (implemented in `scripts/validate-image.sh`; awaiting first CI run)
 - Automate qcow2 boot, login, `sageos-doctor`, journal capture, and artifact
   publication; make failures reproducible locally. (implemented; awaiting the
   first green scheduled CI run)

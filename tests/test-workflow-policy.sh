@@ -20,6 +20,10 @@ done < <(sed -n 's/^[[:space:]]*uses:[[:space:]]*\([^[:space:]#]*\).*/\1/p' "${w
 
 grep -Fq 'attestations: write' "${build}" || fail "workflow cannot publish provenance"
 grep -Fq 'format: spdx-json' "${build}" || fail "SPDX JSON SBOM generation missing"
+# The image/tag variables must remain deferred to the Actions shell.
+# shellcheck disable=SC2016
+grep -Fq 'just validate-image "${IMAGE_NAME}:${DEFAULT_TAG}"' "${build}" \
+    || fail "assembled image validation missing"
 grep -Fq 'sbom: sageos.spdx.json' "${build}" || fail "vulnerability scan does not consume the generated SBOM"
 grep -Fq 'fail-build: false' "${build}" || fail "scan mode changed without updating the baseline policy test"
 # The literal GitHub expression is the policy target, not a shell expansion.

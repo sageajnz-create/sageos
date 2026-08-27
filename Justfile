@@ -52,6 +52,11 @@ validate-vm-qcow2 disk="output/qcow2/disk.qcow2" artifacts="output/vm-validation
     fi
     exit "${validation_rc}"
 
+# Structure and policy checks against an assembled local OCI image.
+[group('Development')]
+validate-image image=(image_name + ":" + default_tag):
+    scripts/validate-image.sh "{{ image }}"
+
 # Check Just Syntax
 [group('Just')]
 check:

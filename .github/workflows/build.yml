@@ -95,6 +95,9 @@ jobs:
       #      ${IMAGE_NAME} \
       #      ${DEFAULT_TAG}
 
+      - name: Validate assembled image
+        run: just validate-image "${IMAGE_NAME}:${DEFAULT_TAG}"
+
       # Export the final image once so scanners inspect the exact rechunked
       # content that will be tagged and pushed. The archive is temporary and
       # deliberately not uploaded as a workflow artifact.
