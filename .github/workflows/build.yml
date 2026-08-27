@@ -25,6 +25,10 @@ jobs:
     name: Build and push image
     runs-on: ubuntu-24.04
 
+    outputs:
+      image: ${{ steps.image-ref.outputs.image }}
+      digest: ${{ steps.push-image.outputs.digest }}
+
     permissions:
       attestations: write
       contents: read
@@ -69,6 +73,10 @@ jobs:
           echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}" >> ${GITHUB_ENV}
           echo "IMAGE_NAME=${IMAGE_NAME,,}" >> ${GITHUB_ENV}
 
+      - name: Record image reference
+        id: image-ref
+        run: echo "image=${IMAGE_REGISTRY}/${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
+
       # This actually builds the container image
       - name: Build Image
         id: build-image
@@ -97,52 +105,6 @@ jobs:
 
       - name: Validate assembled image
         run: just validate-image "${IMAGE_NAME}:${DEFAULT_TAG}"
-
-      # Export the final image once so scanners inspect the exact rechunked
-      # content that will be tagged and pushed. The archive is temporary and
-      # deliberately not uploaded as a workflow artifact.
-      - name: Export image for supply-chain analysis
-        run: |
-          sudo podman save \
-            --format oci-archive \
-            --output sageos.oci.tar \
-            "${IMAGE_NAME}:${DEFAULT_TAG}"
-          sudo chown "$(id -u):$(id -g)" sageos.oci.tar
-
-      - name: Generate SPDX SBOM
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
-        with:
-          image: oci-archive:${{ github.workspace }}/sageos.oci.tar
-          format: spdx-json
-          output-file: sageos.spdx.json
-          artifact-name: sageos-sbom-${{ github.run_id }}.spdx.json
-          upload-artifact-retention: 30
-          upload-release-assets: false
-
-      # Report first, gate later: the inherited Bazzite/Fedora baseline must be
-      # measured and triaged before a severity threshold can be meaningful.
-      - name: Scan SBOM for known vulnerabilities
-        id: vulnerability-scan
-        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
-        with:
-          sbom: sageos.spdx.json
-          fail-build: false
-          only-fixed: true
-          output-format: json
-          output-file: sageos-vulnerabilities.json
-
-      - name: Upload vulnerability report
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: sageos-vulnerabilities-${{ github.run_id }}
-          path: sageos-vulnerabilities.json
-          if-no-files-found: warn
-          retention-days: 30
-
-      - name: Remove temporary image archive
-        if: always()
-        run: rm -f sageos.oci.tar
 
       - name: Generate Build Tags
         id: gen-build-tags
@@ -218,3 +180,49 @@ jobs:
           subject-name: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.push-image.outputs.digest }}
           push-to-registry: true
+
+  supply_chain:
+    name: Generate SBOM and vulnerability report
+    needs: build_push
+    if: github.event_name != 'pull_request' && needs.build_push.result == 'success'
+    runs-on: ubuntu-24.04
+
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      # Scan the published immutable digest in a fresh job. This avoids keeping
+      # a 10+ GB OCI archive beside the long-running image build/rechunk job.
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          image: ${{ needs.build_push.outputs.image }}@${{ needs.build_push.outputs.digest }}
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+          format: spdx-json
+          output-file: sageos.spdx.json
+          artifact-name: sageos-sbom-${{ github.run_id }}.spdx.json
+          upload-artifact-retention: 30
+          upload-release-assets: false
+
+      # Report first, gate later: the inherited Bazzite/Fedora baseline must be
+      # measured and triaged before a severity threshold can be meaningful.
+      - name: Scan SBOM for known vulnerabilities
+        id: vulnerability-scan
+        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
+        with:
+          sbom: sageos.spdx.json
+          fail-build: false
+          only-fixed: true
+          output-format: json
+          output-file: sageos-vulnerabilities.json
+
+      - name: Upload vulnerability report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sageos-vulnerabilities-${{ github.run_id }}
+          path: sageos-vulnerabilities.json
+          if-no-files-found: warn
+          retention-days: 30

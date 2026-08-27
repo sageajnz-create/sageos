@@ -1,14 +1,19 @@
 # Build supply chain
 
-Every SageOS image build runs the following controls against the final
-rechunked OCI image, before publication:
+Every published SageOS image runs the following controls against the final
+rechunked OCI image:
 
-1. Syft generates an SPDX JSON software bill of materials (SBOM).
-2. Grype scans that SBOM for known vulnerabilities with fixes available.
-3. CI retains both reports for 30 days for review and baseline comparison.
-4. Main-branch builds push the image by immutable digest and sign that digest
-   with the SageOS Cosign key.
-5. GitHub Actions publishes build-provenance attestation for the same digest.
+1. The build job contract-tests and pushes the image by immutable digest.
+2. It signs that digest with the SageOS Cosign key and publishes provenance.
+3. A separate job asks Syft to generate an SPDX JSON SBOM directly from that
+   authenticated registry digest, rather than exporting a second local archive.
+4. Grype scans that SBOM for known vulnerabilities with fixes available.
+5. CI retains both reports for 30 days for review and baseline comparison.
+
+Separating analysis from the build gives the scanners an independent runner
+lifetime and prevents a scanner interruption from discarding an already
+validated image. Pull requests build and contract-test without publishing, so
+their unpublished local image does not enter the registry-based scan job.
 
 The scanner initially runs in report-only mode. SageOS inherits a large package
 set from Bazzite and Fedora, so a release-blocking threshold must be based on a

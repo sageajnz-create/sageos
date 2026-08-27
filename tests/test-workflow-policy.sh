@@ -26,10 +26,18 @@ grep -Fq 'just validate-image "${IMAGE_NAME}:${DEFAULT_TAG}"' "${build}" \
     || fail "assembled image validation missing"
 grep -Fq 'sbom: sageos.spdx.json' "${build}" || fail "vulnerability scan does not consume the generated SBOM"
 grep -Fq 'fail-build: false' "${build}" || fail "scan mode changed without updating the baseline policy test"
+grep -Fq 'needs: build_push' "${build}" || fail "supply-chain scan is not isolated from the build job"
+# GitHub expressions are intentionally matched as literal workflow policy.
+# shellcheck disable=SC2016
+grep -Fq 'image: ${{ needs.build_push.outputs.image }}@${{ needs.build_push.outputs.digest }}' "${build}" \
+    || fail "SBOM is not generated from the pushed immutable digest"
+if grep -Fq 'oci-archive:' "${build}"; then
+    fail "workflow recreates the oversized local OCI scan archive"
+fi
 # The literal GitHub expression is the policy target, not a shell expansion.
 # shellcheck disable=SC2016
 grep -Fq 'subject-digest: ${{ steps.push-image.outputs.digest }}' "${build}" \
     || fail "provenance is not bound to the pushed image digest"
 grep -Fq 'push-to-registry: true' "${build}" || fail "provenance is not published with the image"
 
-echo "workflow policy PASS: pinned actions, SBOM, scan, and digest provenance"
+echo "workflow policy PASS: pinned actions, isolated SBOM scan, and digest provenance"
