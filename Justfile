@@ -12,10 +12,45 @@ export bib_image := env_var("BIB_IMAGE")
 alias build-vm := build-qcow2
 alias rebuild-vm := rebuild-qcow2
 alias run-vm := run-vm-qcow2
+alias validate-vm := validate-vm-qcow2
 
 [private]
 default:
     @just --list
+
+# Fast, offline checks required before every commit.
+[group('Development')]
+validate: check lint test
+
+# Repository unit tests that do not require a built image or VM.
+[group('Development')]
+test:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for test_file in tests/test-*.sh; do
+        echo "Running ${test_file}"
+        bash "${test_file}"
+    done
+
+# Boot an existing qcow2 through its serial console and collect health output.
+[group('Development')]
+validate-vm-qcow2 disk="output/qcow2/disk.qcow2" artifacts="output/vm-validation":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    command -v expect >/dev/null || { echo "expect is required" >&2; exit 1; }
+    command -v qemu-system-x86_64 >/dev/null || { echo "qemu-system-x86_64 is required" >&2; exit 1; }
+    [[ -f "{{ disk }}" ]] || { echo "qcow2 not found: {{ disk }}" >&2; exit 1; }
+    mkdir -p "{{ artifacts }}"
+    validation_rc=0
+    scripts/validate-qcow2.exp "{{ disk }}" "{{ artifacts }}/serial.log" "{{ artifacts }}" || validation_rc=$?
+    if [[ -f "{{ artifacts }}/journal.b64" ]]; then
+        base64 --decode "{{ artifacts }}/journal.b64" > "{{ artifacts }}/journal.log"
+        rm "{{ artifacts }}/journal.b64"
+    fi
+    if [[ -f "{{ artifacts }}/doctor.json" ]]; then
+        python3 -m json.tool "{{ artifacts }}/doctor.json" >/dev/null
+    fi
+    exit "${validation_rc}"
 
 # Check Just Syntax
 [group('Just')]

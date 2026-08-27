@@ -1,0 +1,98 @@
+#!/usr/bin/expect -f
+# Boot a SageOS qcow2, run its machine-readable health check over the serial
+# console, collect diagnostics, and power it off. Intended for CI and local use.
+
+set timeout 300
+if {$argc != 3} {
+    puts stderr "usage: validate-qcow2.exp DISK SERIAL_LOG ARTIFACT_DIR"
+    exit 2
+}
+
+set disk [lindex $argv 0]
+set serial_log [lindex $argv 1]
+set artifact_dir [lindex $argv 2]
+file mkdir $artifact_dir
+
+log_file -noappend $serial_log
+spawn qemu-system-x86_64 \
+    -machine q35,accel=kvm:tcg \
+    -smp 2 \
+    -m 4096 \
+    -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
+    -drive file=$disk,format=qcow2,if=virtio \
+    -nic user,model=virtio-net-pci \
+    -display none \
+    -serial stdio \
+    -no-reboot
+
+expect {
+    -re {sageos login: $} {}
+    -re {localhost login: $} {}
+    -re {login: $} {}
+    timeout { puts stderr "VM did not reach a login prompt"; exit 1 }
+    eof { puts stderr "VM exited before login"; exit 1 }
+}
+send "test\r"
+expect {
+    -re {Password: $} {}
+    timeout { puts stderr "VM did not request a password"; exit 1 }
+}
+send "sageos\r"
+expect {
+    -re {[$#] $} {}
+    -re {Login incorrect} { puts stderr "VM login failed"; exit 1 }
+    timeout { puts stderr "VM shell did not become ready"; exit 1 }
+}
+
+send "echo __SAGEOS_DOCTOR_BEGIN__; /usr/libexec/sageos-doctor --json; rc=\$?; echo __SAGEOS_DOCTOR_END__:\$rc\r"
+expect {
+    -re {__SAGEOS_DOCTOR_END__:([0-9]+)} {
+        set doctor_rc $expect_out(1,string)
+    }
+    timeout { puts stderr "sageos-doctor timed out"; exit 1 }
+}
+
+send "echo sageos | sudo -S journalctl -b --no-pager -o short-iso > /tmp/sageos-journal.log; echo __SAGEOS_JOURNAL_READY__\r"
+expect {
+    -re {__SAGEOS_JOURNAL_READY__} {}
+    timeout { puts stderr "journal collection timed out"; exit 1 }
+}
+send "echo __SAGEOS_JOURNAL_BEGIN__; base64 -w 76 /tmp/sageos-journal.log; echo __SAGEOS_JOURNAL_END__\r"
+expect {
+    -re {__SAGEOS_JOURNAL_END__} {}
+    timeout { puts stderr "journal transfer timed out"; exit 1 }
+}
+send "echo sageos | sudo -S poweroff\r"
+expect {
+    eof {}
+    timeout { puts stderr "VM did not power off cleanly"; exit 1 }
+}
+
+# Extract marker-delimited payloads from the raw serial transcript. Terminal
+# carriage returns are removed before parsing.
+set parse [open "|tr -d '\\r' < '$serial_log'" r]
+set transcript [read $parse]
+close $parse
+
+if {![regexp {__SAGEOS_DOCTOR_BEGIN__\n(.*?)\n__SAGEOS_DOCTOR_END__:[0-9]+} $transcript _ doctor_json]} {
+    puts stderr "could not extract doctor JSON from serial log"
+    exit 1
+}
+set output [open "$artifact_dir/doctor.json" w]
+puts $output $doctor_json
+close $output
+
+if {![regexp {__SAGEOS_JOURNAL_BEGIN__\n(.*?)\n__SAGEOS_JOURNAL_END__} $transcript _ journal_b64]} {
+    puts stderr "could not extract journal from serial log"
+    exit 1
+}
+regsub -all {\s} $journal_b64 {} journal_b64
+set output [open "$artifact_dir/journal.b64" w]
+puts -nonewline $output $journal_b64
+close $output
+
+if {$doctor_rc != 0} {
+    puts stderr "sageos-doctor reported failures"
+    exit $doctor_rc
+}
+puts "SageOS qcow2 boot and health validation passed"

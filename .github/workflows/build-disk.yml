@@ -2,6 +2,8 @@
 name: Build disk images
 
 on:
+  schedule:
+    - cron: '35 11 * * *'
   workflow_dispatch:
     inputs:
       upload-to-s3:
@@ -9,12 +11,6 @@ on:
         required: false
         default: false
         type: boolean
-      platform:
-        required: true
-        type: choice
-        options:
-          - amd64
-          - arm64
   pull_request:
     branches:
       - main
@@ -36,11 +32,13 @@ concurrency:
 jobs:
   build:
     name: Build disk images
-    runs-on: ${{ inputs.platform == 'amd64' && 'ubuntu-24.04' || 'ubuntu-24.04-arm' }}
+    # SageOS currently supports x86_64 only. Do not imply an untested arm64
+    # artifact merely because GitHub provides ARM runners.
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        disk-type: ["qcow2", "anaconda-iso"]
+        disk-type: ${{ github.event_name == 'schedule' && fromJSON('["qcow2"]') || fromJSON('["qcow2", "anaconda-iso"]') }}
     permissions:
       contents: read
       packages: read
@@ -60,22 +58,16 @@ jobs:
           echo "USER_UID=${USER_UID}" >> ${GITHUB_ENV}
           echo "USER_GID=${USER_GID}" >> ${GITHUB_ENV}
 
-      - name: Install dependencies
-        if: inputs.platform == 'arm64'
-        run: |
-          set -x
-          sudo apt update -y
-          sudo apt install -y \
-            podman
-
       - name: Maximize build space
-        if: inputs.platform != 'arm64'
         uses: ublue-os/remove-unwanted-software@cc0becac701cf642c8f0a6613bbdaf5dc36b259e # v9
         with:
           remove-codeql: true
 
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Install just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
 
       # The sageos package on GHCR is private; bib pulls as root via sudo
       # podman, so the login must land in root's auth file too.
@@ -95,10 +87,31 @@ jobs:
           # (same reason the Justfile passes --rootfs=btrfs locally)
           additional-args: --use-librepo=True --rootfs btrfs
 
+      - name: Install VM validation dependencies
+        if: matrix.disk-type == 'qcow2'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y expect ovmf qemu-system-x86
+
+      - name: Boot and validate qcow2
+        if: matrix.disk-type == 'qcow2'
+        run: just validate-vm-qcow2 "${{ steps.build.outputs.output-directory }}/qcow2/disk.qcow2"
+
+      - name: Upload VM diagnostics
+        if: always() && matrix.disk-type == 'qcow2'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vm-validation-${{ github.run_id }}
+          path: output/vm-validation
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 6
+
       - name: Upload disk images and Checksum to Job Artifacts
         if: inputs.upload-to-s3 != true && github.event_name != 'pull_request'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
+          name: ${{ matrix.disk-type }}-${{ github.run_id }}
           path: ${{ steps.build.outputs.output-directory }}
           if-no-files-found: error
           retention-days: 0

@@ -6,6 +6,14 @@ Gaming-first, atomic, daily-driver Linux for x86_64 PCs. Built as a custom
 
 **Status: Phase 5 — update policy & rollback.** See [docs/roadmap.md](docs/roadmap.md).
 
+The next product phases, including the AI runtime, Windows compatibility,
+customization system, and release gates, are defined in
+[docs/development-plan.md](docs/development-plan.md). Developer-machine setup
+and the local test loop are in [docs/development.md](docs/development.md).
+Image-key rotation and recovery are documented in
+[docs/signing-and-recovery.md](docs/signing-and-recovery.md); report security
+issues using [SECURITY.md](SECURITY.md).
+
 ## How this works
 
 The entire OS is defined by this repo:

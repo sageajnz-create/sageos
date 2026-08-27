@@ -8,8 +8,10 @@
 
 set -uo pipefail
 
-LIST="/usr/share/sageos/flatpaks.list"
-VER_FILE="/etc/sageos/flatpak_setup_version"
+# Overrides exist solely so the exact shipped script can be exercised by the
+# repository's unprivileged offline tests. The systemd unit supplies neither.
+LIST="${SAGEOS_FLATPAK_LIST:-/usr/share/sageos/flatpaks.list}"
+VER_FILE="${SAGEOS_FLATPAK_VERSION_FILE:-/etc/sageos/flatpak_setup_version}"
 VER="$(sha256sum "${LIST}" | cut -d' ' -f1)"
 
 if [[ -f "${VER_FILE}" && "$(cat "${VER_FILE}")" == "${VER}" ]]; then
@@ -31,7 +33,7 @@ while read -r ref; do
 done < <(grep -vE '^\s*(#|$)' "${LIST}")
 
 if [[ "${failed}" -eq 0 ]]; then
-    mkdir -p /etc/sageos
+    mkdir -p "$(dirname "${VER_FILE}")"
     echo "${VER}" > "${VER_FILE}"
     echo "SageOS flatpak setup complete (${VER:0:12})."
 fi

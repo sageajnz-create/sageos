@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Flatpak command stub used by test-flatpak-setup.sh.
+set -euo pipefail
+
+printf '%s\n' "$*" >> "${SAGEOS_TEST_FLATPAK_LOG}"
+if [[ -n "${SAGEOS_TEST_FAIL_REF:-}" && "$*" == *"${SAGEOS_TEST_FAIL_REF}"* ]]; then
+    exit 1
+fi

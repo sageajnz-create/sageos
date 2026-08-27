@@ -41,10 +41,12 @@ jobs:
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 #v4.0.0
 
-      - name: Check Just Syntax
+      - name: Validate repository
         shell: bash
         run: |
-          just check
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+          just validate
 
       - name: Image Name
         id: image-name
@@ -158,4 +160,3 @@ jobs:
           DIGEST: ${{ steps.push-image.outputs.digest }}
         run: |
           cosign sign -y --key env://COSIGN_PRIVATE_KEY ${IMAGE_REGISTRY}/${IMAGE_NAME}@${DIGEST}
-

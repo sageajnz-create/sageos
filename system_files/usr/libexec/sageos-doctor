@@ -8,15 +8,45 @@
 
 set -uo pipefail
 
+json_mode=false
+case "${1:-}" in
+    --json) json_mode=true ;;
+    "") ;;
+    *) echo "Usage: sageos-doctor [--json]" >&2; exit 2 ;;
+esac
+
+result_file=""
+current_section=""
+if "${json_mode}"; then
+    result_file="$(mktemp)" || exit 1
+    trap 'rm -f "${result_file}"' EXIT
+fi
+
 pass=0 fail=0 warn=0
 
-ok()   { printf '  \033[32mPASS\033[0m  %s\n' "$1"; pass=$((pass+1)); }
-bad()  { printf '  \033[31mFAIL\033[0m  %s\n' "$1"; fail=$((fail+1)); }
-note() { printf '  \033[33mWARN\033[0m  %s\n' "$1"; warn=$((warn+1)); }
+record() {
+    local status="$1" message="$2"
+    if "${json_mode}"; then
+        printf '%s\t%s\t%s\n' "${status}" "${current_section}" "${message}" >> "${result_file}"
+    else
+        case "${status}" in
+            pass) printf '  \033[32mPASS\033[0m  %s\n' "${message}" ;;
+            fail) printf '  \033[31mFAIL\033[0m  %s\n' "${message}" ;;
+            warn) printf '  \033[33mWARN\033[0m  %s\n' "${message}" ;;
+        esac
+    fi
+}
 
-section() { printf '\n\033[1m-- %s --\033[0m\n' "$1"; }
+ok()   { record pass "$1"; pass=$((pass+1)); }
+bad()  { record fail "$1"; fail=$((fail+1)); }
+note() { record warn "$1"; warn=$((warn+1)); }
 
-echo "== SageOS doctor =="
+section() {
+    current_section="$1"
+    "${json_mode}" || printf '\n\033[1m-- %s --\033[0m\n' "$1"
+}
+
+"${json_mode}" || echo "== SageOS doctor =="
 
 section "Image identity"
 if grep -qs "NAME=SageOS" /etc/sageos-release; then
@@ -171,5 +201,30 @@ systemctl is-enabled greenboot-healthcheck.service &>/dev/null \
     && ok "greenboot health checks enabled" \
     || note "greenboot not enabled (automatic rollback on failed boot unavailable)"
 
-printf '\n\033[1m== Summary: %d passed, %d warnings, %d failed ==\033[0m\n' "${pass}" "${warn}" "${fail}"
+if "${json_mode}"; then
+    python3 - "${result_file}" "${pass}" "${warn}" "${fail}" <<'PYEOF'
+import json
+import sys
+
+path, passed, warnings, failed = sys.argv[1:]
+checks = []
+with open(path, encoding="utf-8") as results:
+    for line in results:
+        status, section, message = line.rstrip("\n").split("\t", 2)
+        checks.append({"status": status, "section": section, "message": message})
+
+print(json.dumps({
+    "schema_version": 1,
+    "healthy": int(failed) == 0,
+    "summary": {
+        "passed": int(passed),
+        "warnings": int(warnings),
+        "failed": int(failed),
+    },
+    "checks": checks,
+}, indent=2))
+PYEOF
+else
+    printf '\n\033[1m== Summary: %d passed, %d warnings, %d failed ==\033[0m\n' "${pass}" "${warn}" "${fail}"
+fi
 [[ "${fail}" -eq 0 ]]
