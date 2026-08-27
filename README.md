@@ -13,6 +13,8 @@ and the local test loop are in [docs/development.md](docs/development.md).
 Image-key rotation and recovery are documented in
 [docs/signing-and-recovery.md](docs/signing-and-recovery.md); report security
 issues using [SECURITY.md](SECURITY.md).
+SBOM, vulnerability-report, signing, and provenance behavior is described in
+[docs/supply-chain.md](docs/supply-chain.md).
 
 ## How this works
 

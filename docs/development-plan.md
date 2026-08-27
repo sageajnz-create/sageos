@@ -104,8 +104,8 @@ bundles while adding GUI previews, validation, migrations, and undo history.
   publication; make failures reproducible locally. (implemented; awaiting the
   first green scheduled CI run)
 - Add SBOM, vulnerability scanning, provenance, recovery-key documentation,
-  and a security disclosure policy. (recovery and disclosure documentation
-  done; build attestations and scanning remain)
+  and a security disclosure policy. (implemented; vulnerability reporting is
+  non-blocking until the first image baseline is triaged)
 - Resolve executable-bit inconsistency for shipped scripts and tests. (done:
   enforced by `tests/test-image-structure.sh`)
 
