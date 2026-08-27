@@ -15,6 +15,8 @@ Image-key rotation and recovery are documented in
 issues using [SECURITY.md](SECURITY.md).
 SBOM, vulnerability-report, signing, and provenance behavior is described in
 [docs/supply-chain.md](docs/supply-chain.md).
+Current x86_64 hardware boundaries and the pre-release `latest`/testing channel
+contract are defined in [docs/support-policy.md](docs/support-policy.md).
 
 ## How this works
 
@@ -30,7 +32,8 @@ The entire OS is defined by this repo:
 | `disk_config/` | bootc-image-builder configs for ISO and disk images |
 | `Justfile` | Local build/test recipes (`just build`, `just build-iso`, `just run-vm-qcow2`) |
 
-Every push to `main` publishes `ghcr.io/sageajnz-create/sageos:latest`. Installed
+Every push to `main` publishes the testing channel as
+`ghcr.io/sageajnz-create/sageos:latest`. Installed
 machines update to it atomically (nightly via `uupd`), verify each update
 against the committed `cosign.pub` key before installing it, and can roll back
 to the previous image from the GRUB menu — the running deployment is pinned at
@@ -62,6 +65,9 @@ systemctl reboot
 Rollback at any time: pick the previous deployment in GRUB, or
 `sudo bootc rollback`. Details and the dual-boot disk plan:
 [docs/install.md](docs/install.md).
+
+SageOS has no stable channel yet. During pre-release, `latest` explicitly means
+testing; see the support policy before installing on a primary machine.
 
 ## Development
 

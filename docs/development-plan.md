@@ -97,7 +97,8 @@ bundles while adding GUI previews, validation, migrations, and undo history.
 
 ### Phase 6A — engineering foundation
 
-- Define supported hardware and release channels (`stable`, `testing`).
+- Define supported hardware and release channels (`stable`, `testing`). (done
+  in `docs/support-policy.md`; stable publication remains a Phase 10 gate)
 - Add a single `just validate` gate and run it in CI.
 - Add container structure tests for files, modes, services, policy, and ujust.
 - Automate qcow2 boot, login, `sageos-doctor`, journal capture, and artifact
@@ -204,8 +205,9 @@ agent safe tools to use and gives users a complete non-AI recovery path.
 - Disk CI builds artifacts but does not boot or assert them automatically.
 - The roadmap's phase statuses mix implementation and validation; use separate
   `built`, `VM-verified`, and `hardware-verified` fields going forward.
-- The image is AMD-first and x86_64 in practice, while disk CI exposes arm64;
-  supported architecture claims need an explicit decision and test matrix.
+- The image is AMD-first and explicitly x86_64; the misleading disk-CI arm64
+  option was removed. Intel/NVIDIA remain unverified until the hardware matrix
+  has recorded evidence.
 - The current signing policy protects the SageOS image path, but release
   provenance, SBOM, vulnerability response, key rotation, and recovery are not
   yet a complete supply-chain program.
