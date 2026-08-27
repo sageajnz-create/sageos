@@ -9,7 +9,7 @@
       "ghcr.io/sageajnz-create/sageos": [
         {
           "type": "sigstoreSigned",
-          "keyPath": "/usr/etc/pki/containers/cosign.pub",
+          "keyPath": "/etc/pki/containers/cosign.pub",
           "signedIdentity": {
             "type": "matchRepository"
           }
