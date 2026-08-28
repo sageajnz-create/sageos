@@ -13,6 +13,3 @@ name = "test"
 password = "sageos"
 key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDz3mdKB/GH7dydKeQjjw8oog67xugcMEiTRxSYtU8v0 sageos-vm-test"
 groups = ["wheel"]
-
-[customizations.services]
-enabled = ["sshd"]
