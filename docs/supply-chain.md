@@ -5,15 +5,18 @@ rechunked OCI image:
 
 1. The build job contract-tests and pushes the image by immutable digest.
 2. It signs that digest with the SageOS Cosign key and publishes provenance.
-3. A separate job asks Syft to generate an SPDX JSON SBOM directly from that
-   authenticated registry digest, rather than exporting a second local archive.
-4. Grype scans that SBOM for known vulnerabilities with fixes available.
+3. Syft reads the RPM database from the already-local assembled Podman image
+   and generates an SPDX JSON OS-package SBOM.
+4. A separate job downloads that small SBOM and Grype scans it for known
+   vulnerabilities with fixes available.
 5. CI retains both reports for 30 days for review and baseline comparison.
 
-Separating analysis from the build gives the scanners an independent runner
-lifetime and prevents a scanner interruption from discarding an already
-validated image. Pull requests build and contract-test without publishing, so
-their unpublished local image does not enter the registry-based scan job.
+The RPM-only scope is explicit: it inventories the Fedora/Bazzite/SageOS OS
+packages that the project updates as an image. Full binary and language archive
+cataloging of the 10+ GB gaming image exceeded GitHub-hosted runner resources;
+those ecosystems require separately budgeted catalogers rather than an SBOM
+claim the runner cannot reliably produce. Pull requests still generate the
+package SBOM but do not run the post-publication vulnerability-report job.
 
 The scanner initially runs in report-only mode. SageOS inherits a large package
 set from Bazzite and Fedora, so a release-blocking threshold must be based on a

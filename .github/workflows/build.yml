@@ -18,7 +18,9 @@ env:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}-${{ inputs.brand_name}}-${{ inputs.stream_name }}
-  cancel-in-progress: true
+  # Main/scheduled image builds are expensive and must finish; only supersede
+  # an older run when iterating on the same pull request.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build_push:
@@ -106,6 +108,30 @@ jobs:
       - name: Validate assembled image
         run: just validate-image "${IMAGE_NAME}:${DEFAULT_TAG}"
 
+      - name: Install Syft
+        id: syft
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+
+      # Read only the RPM database from the already-local rootful Podman image.
+      # Full filesystem scans of this 10+ GB gaming image exceed hosted-runner
+      # resources; language/binary catalogers can be added when separately
+      # budgeted and baselined.
+      - name: Generate SPDX package SBOM
+        run: |
+          sudo "${{ steps.syft.outputs.cmd }}" scan \
+            "podman:${IMAGE_NAME}:${DEFAULT_TAG}" \
+            --override-default-catalogers rpm-db-cataloger \
+            --output spdx-json=sageos.spdx.json
+          python3 -m json.tool sageos.spdx.json >/dev/null
+
+      - name: Upload SPDX SBOM
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sageos-sbom-${{ github.run_id }}
+          path: sageos.spdx.json
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Generate Build Tags
         id: gen-build-tags
         run: |
@@ -182,29 +208,20 @@ jobs:
           push-to-registry: true
 
   supply_chain:
-    name: Generate SBOM and vulnerability report
+    name: Scan SBOM for vulnerabilities
     needs: build_push
     if: github.event_name != 'pull_request' && needs.build_push.result == 'success'
     runs-on: ubuntu-24.04
 
     permissions:
+      actions: read
       contents: read
-      packages: read
 
     steps:
-      # Scan the published immutable digest in a fresh job. This avoids keeping
-      # a 10+ GB OCI archive beside the long-running image build/rechunk job.
-      - name: Generate SPDX SBOM
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+      - name: Download SPDX SBOM
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          image: ${{ needs.build_push.outputs.image }}@${{ needs.build_push.outputs.digest }}
-          registry-username: ${{ github.actor }}
-          registry-password: ${{ secrets.GITHUB_TOKEN }}
-          format: spdx-json
-          output-file: sageos.spdx.json
-          artifact-name: sageos-sbom-${{ github.run_id }}.spdx.json
-          upload-artifact-retention: 30
-          upload-release-assets: false
+          name: sageos-sbom-${{ github.run_id }}
 
       # Report first, gate later: the inherited Bazzite/Fedora baseline must be
       # measured and triaged before a severity threshold can be meaningful.
