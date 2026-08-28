@@ -2,7 +2,14 @@
 # Boot a SageOS qcow2, run its machine-readable health check over the serial
 # console, collect diagnostics, and power it off. Intended for CI and local use.
 
-set timeout 300
+# Bazzite-derived images can spend several minutes completing first-boot
+# provisioning before getty starts. Keep that one wait generous, then use
+# tighter stage-specific limits so a hung health check still fails promptly.
+set login_timeout 900
+set prompt_timeout 60
+set command_timeout 300
+set shutdown_timeout 120
+set timeout $login_timeout
 if {$argc != 3} {
     puts stderr "usage: validate-qcow2.exp DISK SERIAL_LOG ARTIFACT_DIR"
     exit 2
@@ -33,6 +40,7 @@ expect {
     eof { puts stderr "VM exited before login"; exit 1 }
 }
 send "test\r"
+set timeout $prompt_timeout
 expect {
     -re {Password: $} {}
     timeout { puts stderr "VM did not request a password"; exit 1 }
@@ -45,6 +53,7 @@ expect {
 }
 
 send "echo __SAGEOS_DOCTOR_BEGIN__; /usr/libexec/sageos-doctor --json; rc=\$?; echo __SAGEOS_DOCTOR_END__:\$rc\r"
+set timeout $command_timeout
 expect {
     -re {__SAGEOS_DOCTOR_END__:([0-9]+)} {
         set doctor_rc $expect_out(1,string)
@@ -63,6 +72,7 @@ expect {
     timeout { puts stderr "journal transfer timed out"; exit 1 }
 }
 send "echo sageos | sudo -S poweroff\r"
+set timeout $shutdown_timeout
 expect {
     eof {}
     timeout { puts stderr "VM did not power off cleanly"; exit 1 }

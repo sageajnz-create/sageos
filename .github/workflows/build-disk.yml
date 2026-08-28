@@ -17,6 +17,8 @@ on:
     paths:
       - './disk_config/disk.toml'
       - './disk_config/iso.toml'
+      - './scripts/validate-qcow2.exp'
+      - './Justfile'
       - './.github/workflows/build-disk.yml'
 
 env:
