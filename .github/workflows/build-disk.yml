@@ -76,17 +76,6 @@ jobs:
       - name: Login to GitHub Container Registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | sudo podman login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      # bootc-image-builder launches bootc in a nested build environment that
-      # inherits the runner's containers policy. GitHub's runner can expose an
-      # empty policy file there, which makes qcow2 installation fail before the
-      # image's own signed-update policy is deployed.
-      - name: Initialize builder containers policy
-        run: |
-          sudo install -d -m 0755 /etc/containers
-          printf '%s\n' '{"default":[{"type":"insecureAcceptAnything"}]}' \
-            | sudo tee /etc/containers/policy.json >/dev/null
-          sudo python3 -m json.tool /etc/containers/policy.json >/dev/null
-
       - name: Build disk images
         id: build
         uses: osbuild/bootc-image-builder-action@8661cd3832544ad68c12dcde8681b13ab0f56a8d # main

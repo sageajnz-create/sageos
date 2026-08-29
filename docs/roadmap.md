@@ -74,8 +74,8 @@ hardware and explicit sign-off before the next begins.
   retention, never below it. Complements greenboot (already enabled in base),
   which rolls back automatically when boot health checks fail.
 - **Signed-image enforcement via containers policy.** The image now ships
-  `/etc/containers/policy.json` requiring a sigstore signature from our
-  public key (`/etc/pki/containers/cosign.pub`, the repo's cosign.pub)
+  `/usr/etc/containers/policy.json` requiring a sigstore signature from our
+  public key (`/usr/etc/pki/containers/cosign.pub`, the repo's cosign.pub)
   for `ghcr.io/sageajnz-create/sageos`. CI already signs every pushed image
   with the matching private key, so updates verify end to end; anything else
   pulled under that ref is rejected. Other registries keep the permissive

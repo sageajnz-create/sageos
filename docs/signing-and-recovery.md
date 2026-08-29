@@ -2,8 +2,8 @@
 
 SageOS CI signs the pushed image digest with Cosign. Installed systems require
 that signature for the `ghcr.io/sageajnz-create/sageos` repository through
-`/etc/containers/policy.json`. The matching public key is embedded at
-`/etc/pki/containers/cosign.pub`; the private key exists only in the GitHub
+`/usr/etc/containers/policy.json`. The matching public key is embedded at
+`/usr/etc/pki/containers/cosign.pub`; the private key exists only in the GitHub
 Actions secret `SIGNING_SECRET`.
 
 The two committed public-key copies (`cosign.pub` and the image overlay copy)

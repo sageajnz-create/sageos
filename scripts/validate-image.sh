@@ -42,7 +42,7 @@ python3 - <<'PYEOF'
 import json
 from pathlib import Path
 
-policy = json.loads(Path("/etc/containers/policy.json").read_text())
+policy = json.loads(Path("/usr/etc/containers/policy.json").read_text())
 rules = policy["transports"]["docker"]["ghcr.io/sageajnz-create/sageos"]
 if not any(rule.get("type") == "sigstoreSigned" for rule in rules):
     raise SystemExit("FAIL: assembled image does not enforce SageOS signatures")

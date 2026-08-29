@@ -112,16 +112,24 @@ jobs:
         id: syft
         uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
 
-      # Read only the RPM database from the already-local rootful Podman image.
+      # Mount the already-local rootful Podman image and read only its RPM DB.
+      # Syft's podman: source requires a Podman API socket, which is not started
+      # on GitHub-hosted runners; a read-only image mount needs no daemon or
+      # multi-gigabyte archive.
       # Full filesystem scans of this 10+ GB gaming image exceed hosted-runner
       # resources; language/binary catalogers can be added when separately
       # budgeted and baselined.
       - name: Generate SPDX package SBOM
         run: |
+          image="${IMAGE_NAME}:${DEFAULT_TAG}"
+          mountpoint="$(sudo podman image mount "${image}")"
+          trap 'sudo podman image unmount "${image}"' EXIT
           sudo "${{ steps.syft.outputs.cmd }}" scan \
-            "podman:${IMAGE_NAME}:${DEFAULT_TAG}" \
+            "dir:${mountpoint}" \
+            --source-name "${IMAGE_REGISTRY}/${image}" \
             --override-default-catalogers rpm-db-cataloger \
             --output spdx-json=sageos.spdx.json
+          sudo chown "$(id -u):$(id -g)" sageos.spdx.json
           python3 -m json.tool sageos.spdx.json >/dev/null
 
       - name: Upload SPDX SBOM

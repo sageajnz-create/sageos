@@ -157,8 +157,8 @@ if [[ -f /etc/rpm-ostreed.conf ]] && grep -q "AutomaticUpdatePolicy=none" /etc/r
 else
     note "rpm-ostreed.conf not set to none — possible double-update path"
 fi
-POLICY="/etc/containers/policy.json"
-KEY="/etc/pki/containers/cosign.pub"
+POLICY="/usr/etc/containers/policy.json"
+KEY="/usr/etc/pki/containers/cosign.pub"
 IMAGE_REF="ghcr.io/sageajnz-create/sageos"
 if [[ -f "${POLICY}" && -f "${KEY}" ]] \
     && grep -q "sigstoreSigned" "${POLICY}" \
