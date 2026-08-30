@@ -4,7 +4,9 @@ Gaming-first, atomic, daily-driver Linux for x86_64 PCs. Built as a custom
 [bootc](https://bootc-dev.github.io/bootc/) image on top of
 [Bazzite](https://bazzite.gg) (Fedora Atomic + Universal Blue).
 
-**Status: Phase 5 — update policy & rollback.** See [docs/roadmap.md](docs/roadmap.md).
+**Status: Phase 6A — engineering foundation and automated release gates.** See
+[docs/development-plan.md](docs/development-plan.md) for the current execution
+plan and [docs/roadmap.md](docs/roadmap.md) for validated product milestones.
 
 The next product phases, including the AI runtime, Windows compatibility,
 customization system, and release gates, are defined in
