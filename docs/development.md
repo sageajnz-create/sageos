@@ -6,6 +6,20 @@ Use a Linux host with Podman and KVM. Building the bootc image needs network
 access and substantial storage; bootable image builds additionally need
 rootful Podman. The repository's fast checks are offline and unprivileged.
 
+### macOS fast checks
+
+macOS can run the Level 0 validation gate even though image and VM builds still
+require Linux. Install the test dependencies with Homebrew and put GNU
+coreutils ahead of the macOS utilities for the test process:
+
+```bash
+brew install bash coreutils just shellcheck
+PATH="$(brew --prefix coreutils)/libexec/gnubin:$PATH" just validate
+```
+
+`shfmt` is only required by `just format`; `cosign` is only required for manual
+signature verification and key-management work.
+
 For Arch Linux or Omarchy:
 
 ```bash

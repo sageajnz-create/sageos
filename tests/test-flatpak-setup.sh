@@ -26,12 +26,12 @@ expected_version="$(sha256sum "${list}" | cut -d' ' -f1)"
 
 # A matching marker must make repeat boots a zero-work no-op.
 printf '%s\n' "${expected_version}" > "${version_file}"
-"${script}" >/dev/null
+bash "${script}" >/dev/null
 [[ ! -e "${flatpak_log}" ]] || { echo "FAIL: current list invoked flatpak" >&2; exit 1; }
 
 # A changed list installs every real entry and records the hash only on success.
 rm "${version_file}"
-"${script}" >/dev/null
+bash "${script}" >/dev/null
 [[ "$(cat "${version_file}")" == "${expected_version}" ]] \
     || { echo "FAIL: successful run did not record list version" >&2; exit 1; }
 grep -Fq -- 'install --system --noninteractive --or-update flathub com.example.First' "${flatpak_log}"
@@ -44,7 +44,7 @@ grep -Fq -- 'install --system --noninteractive --or-update flathub org.example.S
 rm -f "${version_file}" "${flatpak_log}"
 export SAGEOS_TEST_FAIL_REF=org.example.Second
 setup_rc=0
-"${script}" >/dev/null 2>&1 || setup_rc=$?
+bash "${script}" >/dev/null 2>&1 || setup_rc=$?
 [[ "${setup_rc}" -ne 0 ]] || { echo "FAIL: injected install failure returned success" >&2; exit 1; }
 [[ ! -e "${version_file}" ]] || { echo "FAIL: partial install wrote success marker" >&2; exit 1; }
 [[ "$(grep -c '^install ' "${flatpak_log}")" -eq 2 ]] \

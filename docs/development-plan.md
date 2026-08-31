@@ -99,12 +99,14 @@ bundles while adding GUI previews, validation, migrations, and undo history.
 
 - Define supported hardware and release channels (`stable`, `testing`). (done
   in `docs/support-policy.md`; stable publication remains a Phase 10 gate)
-- Add a single `just validate` gate and run it in CI.
+- Add a single `just validate` gate and run it in CI. (done; six offline test
+  suites plus formatting and ShellCheck run before every image build)
 - Add container structure tests for files, modes, services, policy, and ujust.
-  (implemented in `scripts/validate-image.sh`; awaiting first CI run)
+  (done; `scripts/validate-image.sh` passed in PR CI on 2026-08-31)
 - Automate qcow2 boot, login, `sageos-doctor`, journal capture, and artifact
-  publication; make failures reproducible locally. (implemented; awaiting the
-  first green scheduled CI run)
+  publication; make failures reproducible locally. (implemented; the nightly
+  disk workflow now follows a successful scheduled image publication; first
+  green end-to-end run is the remaining Phase 6A gate)
 - Add SBOM, vulnerability scanning, provenance, recovery-key documentation,
   and a security disclosure policy. (implemented; vulnerability reporting is
   non-blocking until the first image baseline is triaged)
@@ -198,17 +200,35 @@ agent safe tools to use and gives users a complete non-AI recovery path.
   integration. Subscription access and API access must be treated separately.
 - Definition of "Windows support" for the first release and the public test set.
 
-## Current repository gaps found in the audit
+## Current progress and prioritized execution plan
 
-- CI builds images but previously did not run ShellCheck or unit tests.
-- Only deployment pinning has an offline unit test; doctor, Flatpak setup,
-  signing policy, service enablement, and build stages are untested in isolation.
-- Disk CI builds artifacts but does not boot or assert them automatically.
-- The roadmap's phase statuses mix implementation and validation; use separate
-  `built`, `VM-verified`, and `hardware-verified` fields going forward.
-- The image is AMD-first and explicitly x86_64; the misleading disk-CI arm64
-  option was removed. Intel/NVIDIA remain unverified until the hardware matrix
-  has recorded evidence.
-- The current signing policy protects the SageOS image path, but release
-  provenance, SBOM, vulnerability response, key rotation, and recovery are not
-  yet a complete supply-chain program.
+Snapshot: 2026-08-31.
+
+1. **Restore the green release path (in progress).** Merge the validated
+   `/etc` signature-policy fix, publish a fresh `latest` image, and require the
+   automatically chained qcow2 boot/doctor run to pass. Preserve its
+   `doctor.json`, journal, SBOM, vulnerability report, and provenance as the
+   Phase 6A evidence set.
+2. **Triage the first supply-chain baseline.** Classify fixable vulnerabilities
+   inherited from Bazzite/Fedora, record accepted upstream risk with expiry
+   dates, and only then choose a documented severity gate. Keep the generated
+   SBOM and report non-blocking until that baseline exists.
+3. **Complete hardware validation.** Run the Phase 1/3/4/5 checklists on the
+   reference AMD machine and record image digest, PCI IDs, firmware, kernel,
+   display/audio/controller results, rollback behavior, and known limitations.
+   Intel and NVIDIA remain explicitly unverified until equivalent evidence is
+   captured.
+4. **Start Phase 6B with one vertical slice.** Decide the Control Center/service
+   toolkit, write the versioned read-only system-status contract, and build one
+   UI path covering hardware summary, current image/channel, update state,
+   rollback availability, and diagnostics export. Do not add privileged
+   mutations until preview, authorization, audit, and undo contracts are tested.
+5. **Add the first-boot shell and policy gates.** Once the vertical slice is
+   stable, add onboarding, accessibility/localization rules, explicit telemetry
+   opt-in, and branded defaults expressed as a declarative profile rather than
+   scattered immutable-image edits.
+
+The Phase 6A exit gate is objective: PR image validation is green; completion
+requires one green scheduled image publication followed by its chained qcow2
+boot with a healthy machine-readable doctor report. Phase 6B implementation
+should not be declared started until that evidence is archived.

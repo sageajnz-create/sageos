@@ -52,10 +52,25 @@ fi
 if grep -Fq 'tee /etc/containers/policy.json' "${build_disk}"; then
     fail "disk workflow overrides container policy outside the bootc image"
 fi
+# The nightly VM check must consume the image from a completed scheduled build,
+# not race image publication on an unrelated cron timer.
+grep -Fq 'workflow_run:' "${build_disk}" \
+    || fail "disk workflow does not follow the container build"
+grep -Fq 'github.event.workflow_run.conclusion == '\''success'\''' "${build_disk}" \
+    || fail "disk workflow can run after a failed container build"
+grep -Fq 'github.event.workflow_run.event == '\''schedule'\''' "${build_disk}" \
+    || fail "disk workflow is not restricted to the nightly container build"
+grep -Fq 'github.event.workflow_run.head_branch == github.event.repository.default_branch' "${build_disk}" \
+    || fail "disk workflow can validate an image from a non-default branch"
+grep -A8 -F 'workflow_run:' "${build_disk}" | grep -Fq -- '- main' \
+    || fail "disk workflow trigger is not filtered to main"
+if grep -Fq 'cron:' "${build_disk}"; then
+    fail "disk workflow has an independent schedule and can race image publication"
+fi
 # The literal GitHub expression is the policy target, not a shell expansion.
 # shellcheck disable=SC2016
 grep -Fq 'subject-digest: ${{ steps.push-image.outputs.digest }}' "${build}" \
     || fail "provenance is not bound to the pushed image digest"
 grep -Fq 'push-to-registry: true' "${build}" || fail "provenance is not published with the image"
 
-echo "workflow policy PASS: durable builds, bounded SBOM, scan, and digest provenance"
+echo "workflow policy PASS: durable builds, chained VM gate, bounded SBOM, scan, and digest provenance"

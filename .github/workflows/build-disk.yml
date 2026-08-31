@@ -2,8 +2,16 @@
 name: Build disk images
 
 on:
-  schedule:
-    - cron: '35 11 * * *'
+  # The nightly VM gate follows the scheduled container build instead of using
+  # an independent clock. This guarantees that it pulls the image published by
+  # the successful build which triggered it, even when that build runs slowly.
+  workflow_run:
+    workflows:
+      - Build container image
+    types:
+      - completed
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       upload-to-s3:
@@ -34,13 +42,20 @@ concurrency:
 jobs:
   build:
     name: Build disk images
+    # workflow_run is privileged; only trust the scheduled default-branch build
+    # and never check out or execute artifacts from a pull-request run.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'schedule' &&
+       github.event.workflow_run.head_branch == github.event.repository.default_branch)
     # SageOS currently supports x86_64 only. Do not imply an untested arm64
     # artifact merely because GitHub provides ARM runners.
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        disk-type: ${{ github.event_name == 'schedule' && fromJSON('["qcow2"]') || fromJSON('["qcow2", "anaconda-iso"]') }}
+        disk-type: ${{ github.event_name == 'workflow_run' && fromJSON('["qcow2"]') || fromJSON('["qcow2", "anaconda-iso"]') }}
     permissions:
       contents: read
       packages: read
