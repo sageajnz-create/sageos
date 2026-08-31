@@ -40,12 +40,12 @@ for unit in sageos-flatpak-setup.service sageos-pin.service; do
     assert_contains "${REPO_ROOT}/build_files/scripts.d/30-services.sh" "systemctl enable ${unit}"
 done
 
-policy="${SYSTEM_ROOT}/usr/etc/containers/policy.json"
-key="${SYSTEM_ROOT}/usr/etc/pki/containers/cosign.pub"
-assert_file /usr/etc/containers/policy.json
-assert_file /usr/etc/pki/containers/cosign.pub
-[[ ! -e "${SYSTEM_ROOT}/etc/containers/policy.json" ]] \
-    || fail "immutable containers policy must live in /usr/etc, not runtime /etc"
+policy="${SYSTEM_ROOT}/etc/containers/policy.json"
+key="${SYSTEM_ROOT}/etc/pki/containers/cosign.pub"
+assert_file /etc/containers/policy.json
+assert_file /etc/pki/containers/cosign.pub
+[[ ! -e "${SYSTEM_ROOT}/usr/etc" ]] \
+    || fail "container image must use /etc; /usr/etc is reserved for bootc internals"
 cmp -s "${REPO_ROOT}/cosign.pub" "${key}" \
     || fail "repository and image cosign public keys differ"
 python3 - "${policy}" "${key}" <<'PYEOF'
@@ -62,7 +62,7 @@ except (OSError, json.JSONDecodeError) as exc:
 rules = policy.get("transports", {}).get("docker", {}).get(
     "ghcr.io/sageajnz-create/sageos", []
 )
-expected_key = "/usr/etc/pki/containers/cosign.pub"
+expected_key = "/etc/pki/containers/cosign.pub"
 if not any(rule.get("type") == "sigstoreSigned" and rule.get("keyPath") == expected_key
            for rule in rules):
     raise SystemExit("FAIL: SageOS registry path is not protected by the committed key")

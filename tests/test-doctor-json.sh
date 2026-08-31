@@ -6,7 +6,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 doctor="${repo_root}/system_files/usr/libexec/sageos-doctor"
 
 doctor_rc=0
-report="$("${doctor}" --json)" || doctor_rc=$?
+report="$(bash "${doctor}" --json)" || doctor_rc=$?
 [[ "${doctor_rc}" -eq 0 || "${doctor_rc}" -eq 1 ]] || {
     echo "FAIL: doctor returned unexpected status ${doctor_rc}" >&2
     exit 1
