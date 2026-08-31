@@ -3,9 +3,10 @@
 # console, collect diagnostics, and power it off. Intended for CI and local use.
 
 # Bazzite-derived images can spend several minutes completing first-boot
-# provisioning before getty starts. Keep that one wait generous, then use
-# tighter stage-specific limits so a hung health check still fails promptly.
-set login_timeout 900
+# provisioning and then reboot before getty starts. Keep that whole sequence
+# generous (including a TCG fallback), then use tighter stage-specific limits
+# so a hung health check still fails promptly.
+set login_timeout 1800
 set prompt_timeout 60
 set command_timeout 300
 set shutdown_timeout 120
@@ -29,8 +30,7 @@ spawn qemu-system-x86_64 \
     -drive file=$disk,format=qcow2,if=virtio \
     -nic user,model=virtio-net-pci \
     -display none \
-    -serial stdio \
-    -no-reboot
+    -serial stdio
 
 expect {
     -re {sageos login: $} {}

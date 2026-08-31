@@ -1,0 +1,7 @@
+# bootc-image-builder executes disk stages inside this build root. The upstream
+# Fedora bootc provides a valid containers policy; add mkfs.btrfs, which
+# SageOS needs because its disk images use a btrfs root filesystem.
+FROM quay.io/fedora/fedora-bootc:42
+
+RUN dnf install -y btrfs-progs \
+    && dnf clean all
