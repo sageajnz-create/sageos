@@ -23,17 +23,21 @@ on:
     branches:
       - main
     paths:
-      - './disk_config/disk.toml'
-      - './disk_config/iso.toml'
-      - './scripts/validate-qcow2.exp'
-      - './Justfile'
-      - './.github/workflows/build-disk.yml'
+      - 'disk_config/disk.toml'
+      - 'disk_config/iso.toml'
+      - 'disk_config/Containerfile.buildroot'
+      - 'scripts/validate-qcow2.exp'
+      - 'Justfile'
+      - 'sageos.env'
+      - '.github/workflows/build-disk.yml'
 
 env:
   IMAGE_NAME: ${{ github.event.repository.name }} # output of build.yml, keep in sync
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"  # do not edit
   DEFAULT_TAG: "latest"
   BIB_IMAGE: "quay.io/centos-bootc/bootc-image-builder:latest"
+  BIB_BUILD_BASE: "quay.io/fedora/fedora-bootc:42"
+  BIB_BUILD_IMAGE: "localhost/sageos-bib-buildroot:fedora42"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
@@ -93,22 +97,82 @@ jobs:
 
       - name: Build disk images
         id: build
-        uses: osbuild/bootc-image-builder-action@8661cd3832544ad68c12dcde8681b13ab0f56a8d # main
-        with:
-          builder-image: ${{ env.BIB_IMAGE }}
-          config-file: ${{ matrix.disk-type == 'anaconda-iso' && './disk_config/iso.toml' || './disk_config/disk.toml' }}
-          image: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}
-          chown: ${{ env.USER_UID }}:${{ env.USER_GID }}
-          types: ${{ matrix.disk-type }}
-          # --rootfs is required: the Bazzite base declares no default rootfs
-          # (same reason the Justfile passes --rootfs=btrfs locally)
-          additional-args: --use-librepo=True --rootfs btrfs
+        shell: bash
+        env:
+          CONFIG_FILE: ${{ matrix.disk-type == 'anaconda-iso' && './disk_config/iso.toml' || './disk_config/disk.toml' }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_REF: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}
+        run: |
+          set -euo pipefail
+
+          POLICY_FILE="${GITHUB_WORKSPACE}/system_files/etc/containers/policy.json"
+          PUBLIC_KEY="${GITHUB_WORKSPACE}/system_files/etc/pki/containers/cosign.pub"
+          python3 -m json.tool "${POLICY_FILE}" >/dev/null
+          test -s "${PUBLIC_KEY}"
+          echo "${GH_TOKEN}" | docker login ghcr.io \
+            --username "${GITHUB_ACTOR}" \
+            --password-stdin
+          gh attestation verify "oci://${IMAGE_REF}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/build.yml" \
+            --source-ref refs/heads/main
+
+          # Ubuntu runners and BIB must agree on the storage driver before the
+          # host container store is shared with the privileged builder.
+          sudo rm -rf /var/lib/containers/storage
+          sudo mkdir -p /etc/containers
+          printf '%s\n' \
+            '[storage]' \
+            'driver = "overlay"' \
+            'runroot = "/run/containers/storage"' \
+            'graphroot = "/var/lib/containers/storage"' \
+            | sudo tee /etc/containers/storage.conf >/dev/null
+
+          mkdir -p output
+          sudo podman pull "${BIB_IMAGE}"
+          sudo podman pull "${IMAGE_REF}"
+          BUILD_CONTAINER_ARGS=()
+          if [[ "${DISK_TYPE}" == "qcow2" ]]; then
+            sudo podman pull "${BIB_BUILD_BASE}"
+            sudo podman build \
+              --pull=never \
+              --tag "${BIB_BUILD_IMAGE}" \
+              --file disk_config/Containerfile.buildroot \
+              .
+            BUILD_CONTAINER_ARGS=(--build-container "${BIB_BUILD_IMAGE}")
+          fi
+          # osbuild replaces /etc with its build container inside bubblewrap.
+          # QCOW2 therefore uses the SageOS policy/key plus mkfs.btrfs;
+          # Anaconda ISO retains the source image as the nested build root.
+          sudo podman run \
+            --rm \
+            --privileged \
+            --security-opt label=type:unconfined_t \
+            --volume /var/lib/containers/storage:/var/lib/containers/storage \
+            --volume "${PWD}/output:/output" \
+            --volume "${CONFIG_FILE}:/config.toml:ro" \
+            --volume "${POLICY_FILE}:/etc/containers/policy.json:ro" \
+            --volume "${PUBLIC_KEY}:/etc/pki/containers/cosign.pub:ro" \
+            "${BIB_IMAGE}" \
+            build \
+            --output /output \
+            --chown "${USER_UID}:${USER_GID}" \
+            --use-librepo=True \
+            --rootfs btrfs \
+            "${BUILD_CONTAINER_ARGS[@]}" \
+            --type "${{ matrix.disk-type }}" \
+            "${IMAGE_REF}"
+
+          echo "output-directory=${PWD}/output" >> "${GITHUB_OUTPUT}"
 
       - name: Install VM validation dependencies
         if: matrix.disk-type == 'qcow2'
         run: |
           sudo apt-get update
           sudo apt-get install -y expect ovmf qemu-system-x86
+          if [[ -e /dev/kvm ]]; then
+            sudo chmod 0666 /dev/kvm
+          fi
 
       - name: Boot and validate qcow2
         if: matrix.disk-type == 'qcow2'

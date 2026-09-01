@@ -160,20 +160,27 @@ fi
 POLICY="/etc/containers/policy.json"
 KEY="/etc/pki/containers/cosign.pub"
 IMAGE_REF="ghcr.io/sageajnz-create/sageos"
-if [[ -f "${POLICY}" && -f "${KEY}" ]] \
-    && grep -q "sigstoreSigned" "${POLICY}" \
-    && grep -q "${IMAGE_REF}" "${POLICY}"; then
-    ok "image signature enforced for ${IMAGE_REF}"
+if [[ ! -f "${POLICY}" ]]; then
+    bad "signature policy file missing (${POLICY})"
+elif [[ ! -f "${KEY}" ]]; then
+    bad "signature public key missing (${KEY})"
+elif ! grep -q "sigstoreSigned" "${POLICY}"; then
+    bad "signature policy does not require sigstore (${POLICY})"
+elif ! grep -q "${IMAGE_REF}" "${POLICY}"; then
+    bad "signature policy does not protect ${IMAGE_REF}"
 else
-    bad "signature policy missing — updates are not verified as ours"
+    ok "image signature enforced for ${IMAGE_REF}"
 fi
 if systemctl is-enabled sageos-pin.service &>/dev/null; then
     if rpm-ostree status --json >/dev/null 2>&1; then
-        export SAGEOS_DOCTOR_STATUS="$(rpm-ostree status --json 2>/dev/null)"
-        pinned="$(python3 - <<'PYEOF'
-import json, os
+        # rpm-ostree's JSON is too large for the environment (E2BIG on exec).
+        status_file="$(mktemp)" || status_file=""
+        pinned="unknown"
+        if [[ -n "${status_file}" ]] && rpm-ostree status --json >"${status_file}" 2>/dev/null; then
+            pinned="$(python3 - "${status_file}" <<'PYEOF'
+import json, sys
 try:
-    deps = json.loads(os.environ["SAGEOS_DOCTOR_STATUS"]).get("deployments") or []
+    deps = json.load(open(sys.argv[1], encoding="utf-8")).get("deployments") or []
 except Exception:
     print("unknown"); raise SystemExit
 booted = next((d for d in deps if d.get("booted")), None)
@@ -185,6 +192,8 @@ else:
     print("pinned" if booted["pinned"] else "unpinned")
 PYEOF
 )"
+        fi
+        [[ -z "${status_file}" ]] || rm -f "${status_file}"
         case "${pinned}" in
             pinned)  ok "booted deployment pinned — rollback point guaranteed" ;;
             unpinned) note "booted deployment not yet pinned (sageos-pin runs at boot)" ;;

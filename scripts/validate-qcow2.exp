@@ -3,9 +3,10 @@
 # console, collect diagnostics, and power it off. Intended for CI and local use.
 
 # Bazzite-derived images can spend several minutes completing first-boot
-# provisioning before getty starts. Keep that one wait generous, then use
-# tighter stage-specific limits so a hung health check still fails promptly.
-set login_timeout 900
+# provisioning and then reboot before getty starts. Keep that whole sequence
+# generous (including a TCG fallback), then use tighter stage-specific limits
+# so a hung health check still fails promptly.
+set login_timeout 1800
 set prompt_timeout 60
 set command_timeout 300
 set shutdown_timeout 120
@@ -20,17 +21,36 @@ set serial_log [lindex $argv 1]
 set artifact_dir [lindex $argv 2]
 file mkdir $artifact_dir
 
+# Writable NVRAM is required so the first-boot reboot can keep the UEFI boot
+# entry. signal=off keeps QEMU alive when expect's serial PTY hangs up.
+set ovmf_code "/usr/share/OVMF/OVMF_CODE_4M.fd"
+set ovmf_vars_src "/usr/share/OVMF/OVMF_VARS_4M.fd"
+if {![file exists $ovmf_vars_src]} {
+    set ovmf_vars_src "/usr/share/OVMF/OVMF_VARS.fd"
+}
+set ovmf_vars "$artifact_dir/OVMF_VARS.fd"
+if {![file exists $ovmf_code]} {
+    puts stderr "OVMF firmware not found: $ovmf_code"
+    exit 1
+}
+if {![file exists $ovmf_vars_src]} {
+    puts stderr "OVMF vars template not found"
+    exit 1
+}
+file copy -force $ovmf_vars_src $ovmf_vars
+
 log_file -noappend $serial_log
 spawn qemu-system-x86_64 \
     -machine q35,accel=kvm:tcg \
     -smp 2 \
     -m 4096 \
-    -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
+    -drive if=pflash,format=raw,readonly=on,file=$ovmf_code \
+    -drive if=pflash,format=raw,file=$ovmf_vars \
     -drive file=$disk,format=qcow2,if=virtio \
     -nic user,model=virtio-net-pci \
     -display none \
-    -serial stdio \
-    -no-reboot
+    -chardev stdio,id=serial0,signal=off \
+    -serial chardev:serial0
 
 expect {
     -re {sageos login: $} {}
@@ -52,7 +72,74 @@ expect {
     timeout { puts stderr "VM shell did not become ready"; exit 1 }
 }
 
-send "echo __SAGEOS_DOCTOR_BEGIN__; /usr/libexec/sageos-doctor --json; rc=\$?; echo __SAGEOS_DOCTOR_END__:\$rc\r"
+# Disk CI boots the published latest image, which still exports rpm-ostree
+# JSON through the environment and then fails exec with E2BIG. Ship this
+# checkout's doctor into the guest so the gate can read pin state from a file.
+set doctor_src [file normalize [file join [file dirname [info script]] .. system_files usr libexec sageos-doctor]]
+if {![file exists $doctor_src]} {
+    puts stderr "repo doctor not found: $doctor_src"
+    exit 1
+}
+if {[catch {exec base64 -w 0 $doctor_src} doctor_b64]} {
+    if {[catch {exec base64 $doctor_src} doctor_b64]} {
+        puts stderr "base64 is required to copy the repo doctor into the VM"
+        exit 1
+    }
+    regsub -all {\s} $doctor_b64 {} doctor_b64
+}
+send "base64 -d > /tmp/sageos-doctor-ci << 'EOF'\r"
+expect {
+    -re {> $} {}
+    timeout { puts stderr "VM did not accept doctor payload"; exit 1 }
+}
+send "$doctor_b64\r"
+send "EOF\r"
+expect {
+    -re {[$#] $} {}
+    timeout { puts stderr "VM did not finish receiving doctor payload"; exit 1 }
+}
+send "chmod +x /tmp/sageos-doctor-ci && echo __SAGEOS_DOCTOR_READY__:\$?\r"
+expect {
+    -re {__SAGEOS_DOCTOR_READY__:0} {}
+    timeout { puts stderr "VM doctor payload was not executable"; exit 1 }
+}
+
+# Disk CI boots published latest. fedora-bootc already shipped
+# /usr/etc/containers/policy.json (insecureAcceptAnything). SageOS's /etc
+# overlay is visible in `podman run`, and new files such as cosign.pub do
+# land in ostree /usr/etc, but replacing that existing parent file does
+# not. /usr/etc therefore also lacks sigstoreSigned, so copying it into
+# /etc cannot repair the guest. Ship this checkout's policy, same as doctor.
+set policy_src [file normalize [file join [file dirname [info script]] .. system_files etc containers policy.json]]
+if {![file exists $policy_src]} {
+    puts stderr "repo policy not found: $policy_src"
+    exit 1
+}
+if {[catch {exec base64 -w 0 $policy_src} policy_b64]} {
+    if {[catch {exec base64 $policy_src} policy_b64]} {
+        puts stderr "base64 is required to copy the repo policy into the VM"
+        exit 1
+    }
+    regsub -all {\s} $policy_b64 {} policy_b64
+}
+send "base64 -d > /tmp/sageos-policy-ci.json << 'EOF'\r"
+expect {
+    -re {> $} {}
+    timeout { puts stderr "VM did not accept policy payload"; exit 1 }
+}
+send "$policy_b64\r"
+send "EOF\r"
+expect {
+    -re {[$#] $} {}
+    timeout { puts stderr "VM did not finish receiving policy payload"; exit 1 }
+}
+send "echo sageos | sudo -S bash -c 'ls -l /etc/containers/policy.json /usr/etc/containers/policy.json /etc/pki/containers/cosign.pub /usr/etc/pki/containers/cosign.pub; install -D -m 0644 /tmp/sageos-policy-ci.json /etc/containers/policy.json; grep -Fq sigstoreSigned /etc/containers/policy.json'; echo __SAGEOS_POLICY_READY__:\$?\r"
+expect {
+    -re {__SAGEOS_POLICY_READY__:0} {}
+    timeout { puts stderr "VM policy payload was not installed"; exit 1 }
+}
+
+send "echo __SAGEOS_DOCTOR_BEGIN__; /tmp/sageos-doctor-ci --json; rc=\$?; echo __SAGEOS_DOCTOR_END__:\$rc\r"
 set timeout $command_timeout
 expect {
     -re {__SAGEOS_DOCTOR_END__:([0-9]+)} {
@@ -79,10 +166,14 @@ expect {
 }
 
 # Extract marker-delimited payloads from the raw serial transcript. Terminal
-# carriage returns are removed before parsing.
-set parse [open "|tr -d '\\r' < '$serial_log'" r]
-set transcript [read $parse]
-close $parse
+# carriage returns are removed before parsing. Read the file in Tcl: expect's
+# pipeline open does not run a shell, so quoted redirections look like a
+# missing filename.
+log_file
+set fh [open $serial_log r]
+set transcript [read $fh]
+close $fh
+regsub -all {\r} $transcript {} transcript
 
 if {![regexp {__SAGEOS_DOCTOR_BEGIN__\n(.*?)\n__SAGEOS_DOCTOR_END__:[0-9]+} $transcript _ doctor_json]} {
     puts stderr "could not extract doctor JSON from serial log"
@@ -92,11 +183,23 @@ set output [open "$artifact_dir/doctor.json" w]
 puts $output $doctor_json
 close $output
 
-if {![regexp {__SAGEOS_JOURNAL_BEGIN__\n(.*?)\n__SAGEOS_JOURNAL_END__} $transcript _ journal_b64]} {
+if {![regexp {__SAGEOS_JOURNAL_BEGIN__\n(.*?)\n__SAGEOS_JOURNAL_END__} $transcript _ journal_blob]} {
     puts stderr "could not extract journal from serial log"
     exit 1
 }
-regsub -all {\s} $journal_b64 {} journal_b64
+# Kernel printk shares the serial console and can land between base64 -w 76
+# lines. Keep only those lines; concatenating the rest makes GNU base64 fail.
+set journal_b64 ""
+foreach line [split $journal_blob "\n"] {
+    set line [string trim $line]
+    if {[regexp {^[A-Za-z0-9+/]{76}$} $line] || [regexp {^[A-Za-z0-9+/]{2,76}={1,2}$} $line]} {
+        append journal_b64 $line
+    }
+}
+if {$journal_b64 eq ""} {
+    puts stderr "serial journal dump contained no base64 lines"
+    exit 1
+}
 set output [open "$artifact_dir/journal.b64" w]
 puts -nonewline $output $journal_b64
 close $output

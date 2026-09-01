@@ -8,6 +8,8 @@ export image_keywords := env_var("IMAGE_KEYWORDS")
 export image_logo_url := env_var("IMAGE_LOGO_URL")
 export default_tag := env_var("DEFAULT_TAG")
 export bib_image := env_var("BIB_IMAGE")
+export bib_build_base := env_var("BIB_BUILD_BASE")
+export bib_build_image := env_var("BIB_BUILD_IMAGE")
 
 alias build-vm := build-qcow2
 alias rebuild-vm := rebuild-qcow2
@@ -44,8 +46,11 @@ validate-vm-qcow2 disk="output/qcow2/disk.qcow2" artifacts="output/vm-validation
     validation_rc=0
     scripts/validate-qcow2.exp "{{ disk }}" "{{ artifacts }}/serial.log" "{{ artifacts }}" || validation_rc=$?
     if [[ -f "{{ artifacts }}/journal.b64" ]]; then
-        base64 --decode "{{ artifacts }}/journal.b64" > "{{ artifacts }}/journal.log"
-        rm "{{ artifacts }}/journal.b64"
+        if ! base64 --decode "{{ artifacts }}/journal.b64" > "{{ artifacts }}/journal.log"; then
+            echo "WARN: serial journal dump was not valid base64" >&2
+            rm -f "{{ artifacts }}/journal.log"
+        fi
+        rm -f "{{ artifacts }}/journal.b64"
     fi
     if [[ -f "{{ artifacts }}/doctor.json" ]]; then
         python3 -m json.tool "{{ artifacts }}/doctor.json" >/dev/null
@@ -338,6 +343,20 @@ _build-bib $target_image $tag $type $config: (_rootful_load_image target_image t
     args+="--rootfs=btrfs"
 
     BUILDTMP=$(mktemp -p "${PWD}" -d -t _build-bib.XXXXXXXXXX)
+    POLICY_FILE="${PWD}/system_files/etc/containers/policy.json"
+    PUBLIC_KEY="${PWD}/system_files/etc/pki/containers/cosign.pub"
+    python3 -m json.tool "${POLICY_FILE}" >/dev/null
+    test -s "${PUBLIC_KEY}"
+    BUILD_CONTAINER_ARGS=()
+    if [[ "{{ type }}" != "iso" && "{{ type }}" != "anaconda-iso" ]]; then
+      sudo podman pull "{{ bib_build_base }}"
+      sudo podman build \
+        --pull=never \
+        --tag "{{ bib_build_image }}" \
+        --file disk_config/Containerfile.buildroot \
+        .
+      BUILD_CONTAINER_ARGS=(--build-container "{{ bib_build_image }}")
+    fi
 
     sudo podman run \
       --rm \
@@ -349,8 +368,11 @@ _build-bib $target_image $tag $type $config: (_rootful_load_image target_image t
       -v $(pwd)/${config}:/config.toml:ro \
       -v $BUILDTMP:/output \
       -v /var/lib/containers/storage:/var/lib/containers/storage \
+      -v "${POLICY_FILE}:/etc/containers/policy.json:ro" \
+      -v "${PUBLIC_KEY}:/etc/pki/containers/cosign.pub:ro" \
       "${bib_image}" \
       ${args} \
+      "${BUILD_CONTAINER_ARGS[@]}" \
       "${target_image}:${tag}"
 
     mkdir -p output
