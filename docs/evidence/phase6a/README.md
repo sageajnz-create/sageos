@@ -34,12 +34,15 @@ That restriction is intentional (see `tests/test-workflow-policy.sh`).
 | PR #8 image validation | Green | [run 33491763846](https://github.com/sageajnz-create/sageos/actions/runs/33491763846) on `69a6a2f` |
 | PR #8 ISO + qcow2 boot/doctor | Green | [run 33491763845](https://github.com/sageajnz-create/sageos/actions/runs/33491763845) on `69a6a2f` |
 | PR #8 merged to `main` | Done | merge commit `ba734b4` |
-| Post-merge `latest` image on `main` | In progress when this note was written | [run 33515917012](https://github.com/sageajnz-create/sageos/actions/runs/33515917012) (`push`, not `schedule`) |
-| Scheduled/chained qcow2 of that `latest` | **Not started** | Disk CI only chains after a **successful scheduled** image build on `main` |
-| SBOM + vuln report + provenance for the post-merge digest | Waiting on 33515917012 (and its scan job) | See “How to fetch artifacts” |
+| Post-merge `latest` image (`push`) | Green | [run 33515917012](https://github.com/sageajnz-create/sageos/actions/runs/33515917012) digest `sha256:111533ed04e9b0836b7046a006d15edf177bbd64b8ecbe0bb69ce360a8a80c3a` |
+| Push-triggered disk chain | Skipped (by design) | [run 33527589159](https://github.com/sageajnz-create/sageos/actions/runs/33527589159) |
+| Scheduled `latest` image on `ba734b4` | Green | [run 33520770178](https://github.com/sageajnz-create/sageos/actions/runs/33520770178) digest `sha256:a98c409012f60ec526788cb7ca710d5959599b4981bf466322006a03ef2e0be5` |
+| Scheduled/chained qcow2 of that `latest` | **In progress** | [run 33535434052](https://github.com/sageajnz-create/sageos/actions/runs/33535434052) (`workflow_run` after the scheduled image) |
+| SBOM + vuln report + provenance for the scheduled digest | Image side done; qcow2 doctor still pending | See tables below |
 
 Do not start Control Center / Phase 6B until the scheduled/chained qcow2 row
-is green and its `doctor.json` is copied next to this README.
+is green and its `doctor.json` is copied next to this README as
+`chained-qcow2-doctor.json`.
 
 ## PR #8 qcow2 doctor (real output)
 
@@ -66,8 +69,8 @@ Full excerpt: [`pr8-qcow2-pin-journal-excerpt.txt`](pr8-qcow2-pin-journal-excerp
 The published image that booted was still the pre-PR-8 `latest` (see digest
 below). PR #8 already changed `sageos-pin` and `sageos-doctor` to pass
 rpm-ostree JSON through a file instead of the environment. That fix is in
-`ba734b4` and will only be inside `latest` after post-merge image run
-33515917012 (or a later scheduled rebuild) finishes.
+`ba734b4` and is inside both post-merge `latest` digests below. The chained
+qcow2 still has to prove that image boots with a healthy doctor report.
 
 The validator then installed this checkout's doctor and policy into the guest
 and ran `/tmp/sageos-doctor-ci --json`. So the healthy JSON above is the **PR
@@ -95,21 +98,36 @@ green. That is pipeline evidence, not a replacement for a chained run of the
 PR image run 33491763846 uploaded `sageos-sbom-33491763846` but skipped the
 vulnerability job (that job only runs on non-PR events).
 
+## Published images after the PR #8 merge (real digests)
+
+Do not record the `latest` tag as the evidence. These came from the workflow
+“Push To GHCR” / attest logs.
+
+| Event | Run | Digest | Provenance | SBOM artifact | Vuln artifact |
+|---|---|---|---|---|---|
+| `push` after merge | [33515917012](https://github.com/sageajnz-create/sageos/actions/runs/33515917012) | `sha256:111533ed04e9b0836b7046a006d15edf177bbd64b8ecbe0bb69ce360a8a80c3a` | [attestation 44455244](https://github.com/sageajnz-create/sageos/attestations/44455244) | `sageos-sbom-33515917012` (expires 2026-10-01) | `sageos-vulnerabilities-33515917012` |
+| `schedule` on `ba734b4` | [33520770178](https://github.com/sageajnz-create/sageos/actions/runs/33520770178) | `sha256:a98c409012f60ec526788cb7ca710d5959599b4981bf466322006a03ef2e0be5` | [attestation 44474222](https://github.com/sageajnz-create/sageos/attestations/44474222) | `sageos-sbom-33520770178` (expires 2026-10-01) | `sageos-vulnerabilities-33520770178` |
+
+The chained qcow2 started after the scheduled image, so it should pull the
+scheduled digest (`a98c4090…`) which was `latest` at 17:01 UTC.
+
+Compact copy of the scheduled Grype match list:
+[`scheduled-image-vulns-summary.json`](scheduled-image-vulns-summary.json).
+`match_count` is `0` with `only_fixed: true` (Grype 0.110.0, Bazzite 44).
+That means **no RPM findings that already have a fix**, not “the image has
+zero vulnerabilities”. The 20 MB SPDX SBOM stays in GitHub Actions; do not
+commit it.
+
 ## What is still missing for Phase 6A exit
 
-1. Confirm [run 33515917012](https://github.com/sageajnz-create/sageos/actions/runs/33515917012) is **success**, including “Scan SBOM for vulnerabilities”.
-2. Record the new digest from that run’s “Push To GHCR” step (search the log
-   for `digest=sha256:`). Do not treat the `latest` tag as the record.
-3. Wait for the next **scheduled** container build on `main` (`cron` is
-   `05 10 * * *`, 10:05 UTC). If that build is green, GitHub starts “Build
-   disk images” automatically and runs **qcow2 only**.
-4. Download that chained run’s `vm-validation-<run_id>` artifact. Confirm
-   `doctor.json` has `"healthy": true` and `"failed": 0`. Copy it into this
-   folder as `chained-qcow2-doctor.json`. Do not type the JSON by hand.
-5. Keep pointers to that run’s journal, the image run’s SBOM, vulnerability
-   JSON, and provenance attestation.
+1. Wait for chained disk [run 33535434052](https://github.com/sageajnz-create/sageos/actions/runs/33535434052).
+2. If it is green, download `vm-validation-33535434052`. Confirm `doctor.json`
+   has `"healthy": true` and `"failed": 0`. Copy it here as
+   `chained-qcow2-doctor.json`. Do not type the JSON by hand.
+3. Keep the journal next to it (or a short excerpt if the full log is huge).
+   Point at the scheduled image SBOM, vuln artifact, and provenance above.
 
-Until step 4 is done, say “Phase 6A evidence is incomplete”, not “Phase 6A
+Until step 2 is done, say “Phase 6A evidence is incomplete”, not “Phase 6A
 is done”.
 
 ## How to fetch artifacts (copy-paste)
@@ -124,15 +142,16 @@ gh run list --repo sageajnz-create/sageos --branch main --limit 20
 mkdir -p /tmp/sageos-evidence
 gh run download 33491763845 --repo sageajnz-create/sageos --dir /tmp/sageos-evidence/pr8-disk
 
-# 3. After post-merge image 33515917012 finishes:
-gh run view 33515917012 --repo sageajnz-create/sageos
+# 3. Post-merge push image (already finished)
 gh run download 33515917012 --repo sageajnz-create/sageos --dir /tmp/sageos-evidence/post-merge-image
-# Look for sageos-sbom-33515917012 and sageos-vulnerabilities-33515917012
 
-# 4. After a successful scheduled image run, find the chained disk run
-#    (event will be workflow_run, name "Build disk images") and download:
-# gh run download <DISK_RUN_ID> --repo sageajnz-create/sageos --dir /tmp/sageos-evidence/chained-qcow2
-# python3 -m json.tool /tmp/sageos-evidence/chained-qcow2/vm-validation-*/doctor.json
+# 4. Scheduled image that the chained qcow2 follows (already finished)
+gh run download 33520770178 --repo sageajnz-create/sageos --dir /tmp/sageos-evidence/scheduled-image
+
+# 5. Chained qcow2 (run 33535434052; wait until it finishes)
+gh run view 33535434052 --repo sageajnz-create/sageos
+gh run download 33535434052 --repo sageajnz-create/sageos --dir /tmp/sageos-evidence/chained-qcow2
+python3 -m json.tool /tmp/sageos-evidence/chained-qcow2/vm-validation-33535434052/doctor.json
 ```
 
 Optional faster path after `latest` is published, if you do not want to wait
@@ -145,16 +164,14 @@ Do not commit `cosign.key` or any GitHub secret. Artifact zips can include
 firmware blobs (`OVMF_VARS.fd`); keep those out of git. Only the small
 `doctor.json` snapshot belongs in this folder.
 
-## Verify the digest (after post-merge publish)
-
-Replace the digest with the one from the image log:
+## Verify the scheduled digest (the one the chained qcow2 should boot)
 
 ```bash
 cosign verify \
   --key cosign.pub \
-  ghcr.io/sageajnz-create/sageos@sha256:REPLACE_WITH_DIGEST
+  ghcr.io/sageajnz-create/sageos@sha256:a98c409012f60ec526788cb7ca710d5959599b4981bf466322006a03ef2e0be5
 
 gh attestation verify \
-  oci://ghcr.io/sageajnz-create/sageos@sha256:REPLACE_WITH_DIGEST \
+  oci://ghcr.io/sageajnz-create/sageos@sha256:a98c409012f60ec526788cb7ca710d5959599b4981bf466322006a03ef2e0be5 \
   --repo sageajnz-create/sageos
 ```

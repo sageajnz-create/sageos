@@ -104,10 +104,9 @@ bundles while adding GUI previews, validation, migrations, and undo history.
 - Add container structure tests for files, modes, services, policy, and ujust.
   (done; `scripts/validate-image.sh` passed in PR CI on 2026-08-31)
 - Automate qcow2 boot, login, `sageos-doctor`, journal capture, and artifact
-  publication; make failures reproducible locally. (implemented. PR #8 proved
-  ISO + qcow2 boot/doctor green on the PR; the remaining gate is one green
-  **scheduled/chained** qcow2 of post-merge `latest`. Live pointers:
-  `docs/evidence/phase6a/README.md`)
+  publication; make failures reproducible locally. (implemented. PR #8 and
+  post-merge/scheduled image publishes are green; remaining gate is chained
+  qcow2 run 33535434052. Live pointers: `docs/evidence/phase6a/README.md`)
 - Add SBOM, vulnerability scanning, provenance, recovery-key documentation,
   and a security disclosure policy. (implemented; vulnerability reporting is
   non-blocking until the first image baseline is triaged)
@@ -207,18 +206,23 @@ Snapshot: 2026-09-01. Phase 6A is **not closed**. Do not start Phase 6B /
 Control Center until the chained qcow2 row in
 `docs/evidence/phase6a/README.md` is green.
 
-1. **Close the Phase 6A evidence set (in progress).** PR #8 (signed QCOW2) is
-   merged at `ba734b4`. PR head `69a6a2f` was CI-green: image run
+1. **Close the Phase 6A evidence set (in progress).** PR #8 is merged at
+   `ba734b4`. PR image
    [33491763846](https://github.com/sageajnz-create/sageos/actions/runs/33491763846)
-   and disk run
+   and PR disk
    [33491763845](https://github.com/sageajnz-create/sageos/actions/runs/33491763845)
-   (ISO + qcow2 boot, `doctor.json` `"healthy": true`). Post-merge `latest`
-   publication is image run
+   are green. Post-merge push image
    [33515917012](https://github.com/sageajnz-create/sageos/actions/runs/33515917012)
-   (`push` to `main`). The chained VM gate does **not** start from a push; it
-   follows the next successful **scheduled** image build (10:05 UTC). Archive
-   that run’s doctor, journal, SBOM, vulnerability report, and provenance
-   before calling the gate done. How to fetch artifacts is in
+   published `sha256:111533ed04e9b0836b7046a006d15edf177bbd64b8ecbe0bb69ce360a8a80c3a`.
+   Scheduled image
+   [33520770178](https://github.com/sageajnz-create/sageos/actions/runs/33520770178)
+   published `sha256:a98c409012f60ec526788cb7ca710d5959599b4981bf466322006a03ef2e0be5`
+   (SBOM + Grype `matches: []` with `only-fixed: true` + provenance
+   [44474222](https://github.com/sageajnz-create/sageos/attestations/44474222)).
+   The remaining gate is the chained qcow2
+   [33535434052](https://github.com/sageajnz-create/sageos/actions/runs/33535434052),
+   which was still running when this snapshot was written. Do not call Phase
+   6A done until that run’s `doctor.json` is archived. Fetch commands:
    `docs/evidence/phase6a/README.md`.
 2. **Triage the first supply-chain baseline.** Classify fixable vulnerabilities
    inherited from Bazzite/Fedora, record accepted upstream risk with expiry

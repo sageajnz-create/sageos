@@ -1,0 +1,23 @@
+{
+  "workflow_run": 33520770178,
+  "workflow_event": "schedule",
+  "commit": "ba734b4f09cdd89feedd0eebd723c56c6d97d74a",
+  "image_digest": "sha256:a98c409012f60ec526788cb7ca710d5959599b4981bf466322006a03ef2e0be5",
+  "artifact": "sageos-vulnerabilities-33520770178",
+  "scanner": {
+    "name": "grype",
+    "version": "0.110.0",
+    "only_fixed": true
+  },
+  "distro": {
+    "name": "bazzite",
+    "version": "44"
+  },
+  "source": {
+    "type": "directory",
+    "target": "ghcr.io/sageajnz-create/sageos:latest"
+  },
+  "match_count": 0,
+  "matches": [],
+  "note": "Empty matches means Grype found no RPM findings that already have a fix available. This is not a claim that the image is vulnerability-free. Full report is the GitHub artifact; this file is a compact copy of the real match list."
+}
