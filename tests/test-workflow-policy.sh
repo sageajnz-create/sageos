@@ -94,6 +94,23 @@ grep -Fq 'signal=off' "${validator}" \
     || fail "VM validator lets the serial PTY hang up during the first-boot reboot"
 grep -Fq 'OVMF_VARS' "${validator}" \
     || fail "VM validator does not persist UEFI variables across the first-boot reboot"
+grep -Fq '/tmp/sageos-doctor-ci' "${validator}" \
+    || fail "VM validator does not run this checkout's doctor inside the guest"
+if grep -Fq "< '\$serial_log'" "${validator}"; then
+    fail "VM validator still opens the serial log through a quoted shell redirect"
+fi
+doctor="${repo_root}/system_files/usr/libexec/sageos-doctor"
+pin="${repo_root}/system_files/usr/libexec/sageos-pin"
+if grep -Fq 'export SAGEOS_DOCTOR_STATUS=' "${doctor}"; then
+    fail "doctor puts rpm-ostree JSON in the environment"
+fi
+if grep -Fq 'export SAGEOS_PIN_STATUS=' "${pin}"; then
+    fail "pin puts rpm-ostree JSON in the environment"
+fi
+grep -Fq 'python3 - "${status_file}"' "${doctor}" \
+    || fail "doctor does not pass rpm-ostree status through a file"
+grep -Fq 'python3 - "${status_file}"' "${pin}" \
+    || fail "pin does not pass rpm-ostree status through a file"
 grep -Fq 'sudo chmod 0666 /dev/kvm' "${build_disk}" \
     || fail "disk workflow does not enable KVM acceleration for the VM gate"
 # The nightly VM check must consume the image from a completed scheduled build,

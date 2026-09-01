@@ -20,7 +20,7 @@ RESULT="$(SAGEOS_TEST_STATUS="$STATUS" SAGEOS_TEST_SCRIPT="$SCRIPT" run_py - <<'
 import json, os, sys
 
 src = open(os.environ["SAGEOS_TEST_SCRIPT"]).read()
-code = src.split("python3 - <<'PYEOF'\n")[1].split("\nPYEOF")[0]
+code = src.split("python3 - \"${status_file}\" <<'PYEOF'\n")[1].split("\nPYEOF")[0]
 
 calls = []
 class FakeSubprocess:
@@ -30,7 +30,10 @@ class FakeSubprocess:
         calls.append(list(args))
 sys.modules["subprocess"] = FakeSubprocess
 
-os.environ["SAGEOS_PIN_STATUS"] = os.environ.pop("SAGEOS_TEST_STATUS")
+import tempfile
+status_path = tempfile.mkstemp()[1]
+open(status_path, "w", encoding="utf-8").write(os.environ.pop("SAGEOS_TEST_STATUS"))
+sys.argv = ["sageos-pin", status_path]
 exec(compile(code, "sageos-pin-embedded", "exec"))
 
 expected = [
@@ -53,7 +56,7 @@ SAGEOS_TEST_STATUS="$STATUS2" SAGEOS_TEST_SCRIPT="$SCRIPT" run_py - <<'PYEOF'
 import json, os, sys
 
 src = open(os.environ["SAGEOS_TEST_SCRIPT"]).read()
-code = src.split("python3 - <<'PYEOF'\n")[1].split("\nPYEOF")[0]
+code = src.split("python3 - \"${status_file}\" <<'PYEOF'\n")[1].split("\nPYEOF")[0]
 
 calls = []
 class FakeSubprocess:
@@ -63,7 +66,10 @@ class FakeSubprocess:
         calls.append(list(args))
 sys.modules["subprocess"] = FakeSubprocess
 
-os.environ["SAGEOS_PIN_STATUS"] = os.environ.pop("SAGEOS_TEST_STATUS")
+import tempfile
+status_path = tempfile.mkstemp()[1]
+open(status_path, "w", encoding="utf-8").write(os.environ.pop("SAGEOS_TEST_STATUS"))
+sys.argv = ["sageos-pin", status_path]
 try:
     exec(compile(code, "sageos-pin-embedded", "exec"))
 except SystemExit:

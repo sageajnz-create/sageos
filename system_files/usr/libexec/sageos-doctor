@@ -169,11 +169,14 @@ else
 fi
 if systemctl is-enabled sageos-pin.service &>/dev/null; then
     if rpm-ostree status --json >/dev/null 2>&1; then
-        export SAGEOS_DOCTOR_STATUS="$(rpm-ostree status --json 2>/dev/null)"
-        pinned="$(python3 - <<'PYEOF'
-import json, os
+        # rpm-ostree's JSON is too large for the environment (E2BIG on exec).
+        status_file="$(mktemp)" || status_file=""
+        pinned="unknown"
+        if [[ -n "${status_file}" ]] && rpm-ostree status --json >"${status_file}" 2>/dev/null; then
+            pinned="$(python3 - "${status_file}" <<'PYEOF'
+import json, sys
 try:
-    deps = json.loads(os.environ["SAGEOS_DOCTOR_STATUS"]).get("deployments") or []
+    deps = json.load(open(sys.argv[1], encoding="utf-8")).get("deployments") or []
 except Exception:
     print("unknown"); raise SystemExit
 booted = next((d for d in deps if d.get("booted")), None)
@@ -185,6 +188,8 @@ else:
     print("pinned" if booted["pinned"] else "unpinned")
 PYEOF
 )"
+        fi
+        [[ -z "${status_file}" ]] || rm -f "${status_file}"
         case "${pinned}" in
             pinned)  ok "booted deployment pinned — rollback point guaranteed" ;;
             unpinned) note "booted deployment not yet pinned (sageos-pin runs at boot)" ;;

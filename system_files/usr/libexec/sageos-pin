@@ -18,14 +18,17 @@ set -uo pipefail
 command -v rpm-ostree >/dev/null 2>&1 || exit 0
 command -v ostree >/dev/null 2>&1 || exit 0
 
-status="$(rpm-ostree status --json 2>/dev/null)" || exit 0
-export SAGEOS_PIN_STATUS="${status}"
+# rpm-ostree's JSON is too large to export; python3 then fails with E2BIG.
+status_file="$(mktemp)" || exit 0
+trap 'rm -f "${status_file}"' EXIT
+rpm-ostree status --json >"${status_file}" 2>/dev/null || exit 0
+[[ -s "${status_file}" ]] || exit 0
 
-python3 - <<'PYEOF'
-import json, os, subprocess, sys
+python3 - "${status_file}" <<'PYEOF'
+import json, subprocess, sys
 
 try:
-    st = json.loads(os.environ["SAGEOS_PIN_STATUS"])
+    st = json.load(open(sys.argv[1], encoding="utf-8"))
 except Exception:
     sys.exit(0)
 

@@ -72,7 +72,39 @@ expect {
     timeout { puts stderr "VM shell did not become ready"; exit 1 }
 }
 
-send "echo __SAGEOS_DOCTOR_BEGIN__; /usr/libexec/sageos-doctor --json; rc=\$?; echo __SAGEOS_DOCTOR_END__:\$rc\r"
+# Disk CI boots the published latest image, which still exports rpm-ostree
+# JSON through the environment and then fails exec with E2BIG. Ship this
+# checkout's doctor into the guest so the gate can read pin state from a file.
+set doctor_src [file normalize [file join [file dirname [info script]] .. system_files usr libexec sageos-doctor]]
+if {![file exists $doctor_src]} {
+    puts stderr "repo doctor not found: $doctor_src"
+    exit 1
+}
+if {[catch {exec base64 -w 0 $doctor_src} doctor_b64]} {
+    if {[catch {exec base64 $doctor_src} doctor_b64]} {
+        puts stderr "base64 is required to copy the repo doctor into the VM"
+        exit 1
+    }
+    regsub -all {\s} $doctor_b64 {} doctor_b64
+}
+send "base64 -d > /tmp/sageos-doctor-ci << 'EOF'\r"
+expect {
+    -re {> $} {}
+    timeout { puts stderr "VM did not accept doctor payload"; exit 1 }
+}
+send "$doctor_b64\r"
+send "EOF\r"
+expect {
+    -re {[$#] $} {}
+    timeout { puts stderr "VM did not finish receiving doctor payload"; exit 1 }
+}
+send "chmod +x /tmp/sageos-doctor-ci && echo __SAGEOS_DOCTOR_READY__:\$?\r"
+expect {
+    -re {__SAGEOS_DOCTOR_READY__:0} {}
+    timeout { puts stderr "VM doctor payload was not executable"; exit 1 }
+}
+
+send "echo __SAGEOS_DOCTOR_BEGIN__; /tmp/sageos-doctor-ci --json; rc=\$?; echo __SAGEOS_DOCTOR_END__:\$rc\r"
 set timeout $command_timeout
 expect {
     -re {__SAGEOS_DOCTOR_END__:([0-9]+)} {
@@ -99,10 +131,14 @@ expect {
 }
 
 # Extract marker-delimited payloads from the raw serial transcript. Terminal
-# carriage returns are removed before parsing.
-set parse [open "|tr -d '\\r' < '$serial_log'" r]
-set transcript [read $parse]
-close $parse
+# carriage returns are removed before parsing. Read the file in Tcl: expect's
+# pipeline open does not run a shell, so quoted redirections look like a
+# missing filename.
+log_file
+set fh [open $serial_log r]
+set transcript [read $fh]
+close $fh
+regsub -all {\r} $transcript {} transcript
 
 if {![regexp {__SAGEOS_DOCTOR_BEGIN__\n(.*?)\n__SAGEOS_DOCTOR_END__:[0-9]+} $transcript _ doctor_json]} {
     puts stderr "could not extract doctor JSON from serial log"
