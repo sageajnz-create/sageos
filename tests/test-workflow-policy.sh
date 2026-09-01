@@ -110,9 +110,13 @@ grep -Fq '/tmp/sageos-policy-ci.json' "${validator}" \
     || fail "VM validator does not install this checkout's signature policy into the guest"
 grep -Fq '__SAGEOS_POLICY_READY__' "${validator}" \
     || fail "VM validator does not deploy the image signature policy into /etc before doctor"
+grep -Fq {^[A-Za-z0-9+/]{76}$} "${validator}" \
+    || fail "VM validator does not drop kernel serial noise from the journal dump"
 if grep -Fq "< '\$serial_log'" "${validator}"; then
     fail "VM validator still opens the serial log through a quoted shell redirect"
 fi
+grep -Fq 'WARN: serial journal dump was not valid base64' "${justfile}" \
+    || fail "local VM validation fails the gate when the serial journal dump is noisy"
 doctor="${repo_root}/system_files/usr/libexec/sageos-doctor"
 pin="${repo_root}/system_files/usr/libexec/sageos-pin"
 if grep -Fq 'export SAGEOS_DOCTOR_STATUS=' "${doctor}"; then

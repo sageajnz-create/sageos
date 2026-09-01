@@ -46,8 +46,11 @@ validate-vm-qcow2 disk="output/qcow2/disk.qcow2" artifacts="output/vm-validation
     validation_rc=0
     scripts/validate-qcow2.exp "{{ disk }}" "{{ artifacts }}/serial.log" "{{ artifacts }}" || validation_rc=$?
     if [[ -f "{{ artifacts }}/journal.b64" ]]; then
-        base64 --decode "{{ artifacts }}/journal.b64" > "{{ artifacts }}/journal.log"
-        rm "{{ artifacts }}/journal.b64"
+        if ! base64 --decode "{{ artifacts }}/journal.b64" > "{{ artifacts }}/journal.log"; then
+            echo "WARN: serial journal dump was not valid base64" >&2
+            rm -f "{{ artifacts }}/journal.log"
+        fi
+        rm -f "{{ artifacts }}/journal.b64"
     fi
     if [[ -f "{{ artifacts }}/doctor.json" ]]; then
         python3 -m json.tool "{{ artifacts }}/doctor.json" >/dev/null

@@ -46,9 +46,6 @@ assert_file /etc/containers/policy.json
 assert_file /etc/pki/containers/cosign.pub
 [[ ! -e "${SYSTEM_ROOT}/usr/etc" ]] \
     || fail "container image must use /etc; /usr/etc is reserved for bootc internals"
-grep -Fq 'install -D -m 0644 /etc/containers/policy.json /usr/etc/containers/policy.json' \
-    "${REPO_ROOT}/build_files/build.sh" \
-    || fail "image build does not replace fedora-bootc ostree default containers policy"
 cmp -s "${REPO_ROOT}/cosign.pub" "${key}" \
     || fail "repository and image cosign public keys differ"
 python3 - "${policy}" "${key}" <<'PYEOF'

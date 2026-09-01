@@ -183,11 +183,23 @@ set output [open "$artifact_dir/doctor.json" w]
 puts $output $doctor_json
 close $output
 
-if {![regexp {__SAGEOS_JOURNAL_BEGIN__\n(.*?)\n__SAGEOS_JOURNAL_END__} $transcript _ journal_b64]} {
+if {![regexp {__SAGEOS_JOURNAL_BEGIN__\n(.*?)\n__SAGEOS_JOURNAL_END__} $transcript _ journal_blob]} {
     puts stderr "could not extract journal from serial log"
     exit 1
 }
-regsub -all {\s} $journal_b64 {} journal_b64
+# Kernel printk shares the serial console and can land between base64 -w 76
+# lines. Keep only those lines; concatenating the rest makes GNU base64 fail.
+set journal_b64 ""
+foreach line [split $journal_blob "\n"] {
+    set line [string trim $line]
+    if {[regexp {^[A-Za-z0-9+/]{76}$} $line] || [regexp {^[A-Za-z0-9+/]{2,76}={1,2}$} $line]} {
+        append journal_b64 $line
+    }
+}
+if {$journal_b64 eq ""} {
+    puts stderr "serial journal dump contained no base64 lines"
+    exit 1
+}
 set output [open "$artifact_dir/journal.b64" w]
 puts -nonewline $output $journal_b64
 close $output
