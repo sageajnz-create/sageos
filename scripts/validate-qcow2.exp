@@ -104,12 +104,39 @@ expect {
     timeout { puts stderr "VM doctor payload was not executable"; exit 1 }
 }
 
-# osbuild's nested build root can leave /etc/containers from Fedora while the
-# SageOS defaults live in /usr/etc. Deploy those defaults before doctor runs.
-send "echo sageos | sudo -S bash -c 'ls -l /etc/containers/policy.json /usr/etc/containers/policy.json /etc/pki/containers/cosign.pub /usr/etc/pki/containers/cosign.pub; mkdir -p /etc/containers /etc/pki/containers; if grep -Fq sigstoreSigned /usr/etc/containers/policy.json && ! grep -Fq sigstoreSigned /etc/containers/policy.json; then cp -a /usr/etc/containers/policy.json /etc/containers/policy.json; cp -a /usr/etc/pki/containers/cosign.pub /etc/pki/containers/cosign.pub; echo repaired; fi'; echo __SAGEOS_POLICY_READY__\r"
+# Disk CI boots published latest. fedora-bootc already shipped
+# /usr/etc/containers/policy.json (insecureAcceptAnything). SageOS's /etc
+# overlay is visible in `podman run`, and new files such as cosign.pub do
+# land in ostree /usr/etc, but replacing that existing parent file does
+# not. /usr/etc therefore also lacks sigstoreSigned, so copying it into
+# /etc cannot repair the guest. Ship this checkout's policy, same as doctor.
+set policy_src [file normalize [file join [file dirname [info script]] .. system_files etc containers policy.json]]
+if {![file exists $policy_src]} {
+    puts stderr "repo policy not found: $policy_src"
+    exit 1
+}
+if {[catch {exec base64 -w 0 $policy_src} policy_b64]} {
+    if {[catch {exec base64 $policy_src} policy_b64]} {
+        puts stderr "base64 is required to copy the repo policy into the VM"
+        exit 1
+    }
+    regsub -all {\s} $policy_b64 {} policy_b64
+}
+send "base64 -d > /tmp/sageos-policy-ci.json << 'EOF'\r"
 expect {
-    -re {__SAGEOS_POLICY_READY__} {}
-    timeout { puts stderr "VM policy probe timed out"; exit 1 }
+    -re {> $} {}
+    timeout { puts stderr "VM did not accept policy payload"; exit 1 }
+}
+send "$policy_b64\r"
+send "EOF\r"
+expect {
+    -re {[$#] $} {}
+    timeout { puts stderr "VM did not finish receiving policy payload"; exit 1 }
+}
+send "echo sageos | sudo -S bash -c 'ls -l /etc/containers/policy.json /usr/etc/containers/policy.json /etc/pki/containers/cosign.pub /usr/etc/pki/containers/cosign.pub; install -D -m 0644 /tmp/sageos-policy-ci.json /etc/containers/policy.json; grep -Fq sigstoreSigned /etc/containers/policy.json'; echo __SAGEOS_POLICY_READY__:\$?\r"
+expect {
+    -re {__SAGEOS_POLICY_READY__:0} {}
+    timeout { puts stderr "VM policy payload was not installed"; exit 1 }
 }
 
 send "echo __SAGEOS_DOCTOR_BEGIN__; /tmp/sageos-doctor-ci --json; rc=\$?; echo __SAGEOS_DOCTOR_END__:\$rc\r"

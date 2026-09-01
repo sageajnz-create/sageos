@@ -106,6 +106,8 @@ grep -Fq 'OVMF_VARS' "${validator}" \
     || fail "VM validator does not persist UEFI variables across the first-boot reboot"
 grep -Fq '/tmp/sageos-doctor-ci' "${validator}" \
     || fail "VM validator does not run this checkout's doctor inside the guest"
+grep -Fq '/tmp/sageos-policy-ci.json' "${validator}" \
+    || fail "VM validator does not install this checkout's signature policy into the guest"
 grep -Fq '__SAGEOS_POLICY_READY__' "${validator}" \
     || fail "VM validator does not deploy the image signature policy into /etc before doctor"
 if grep -Fq "< '\$serial_log'" "${validator}"; then
