@@ -1,0 +1,136 @@
+{
+    "schema_version": 1,
+    "healthy": true,
+    "summary": {
+        "passed": 15,
+        "warnings": 10,
+        "failed": 0
+    },
+    "checks": [
+        {
+            "status": "pass",
+            "section": "Image identity",
+            "message": "/etc/sageos-release present"
+        },
+        {
+            "status": "pass",
+            "section": "Image identity",
+            "message": "booted deployment is a SageOS image"
+        },
+        {
+            "status": "warn",
+            "section": "Graphics",
+            "message": "Vulkan: llvmpipe software renderer (VM or driver problem)"
+        },
+        {
+            "status": "warn",
+            "section": "Graphics",
+            "message": "OpenGL: renderer not radeonsi (no display session?)"
+        },
+        {
+            "status": "warn",
+            "section": "Graphics",
+            "message": "VA-API: no entrypoints (VM, or missing display session)"
+        },
+        {
+            "status": "warn",
+            "section": "Graphics",
+            "message": "session is tty, expected wayland"
+        },
+        {
+            "status": "warn",
+            "section": "Audio",
+            "message": "PipeWire: running but no default device marked"
+        },
+        {
+            "status": "pass",
+            "section": "Gaming stack",
+            "message": "Steam present (native)"
+        },
+        {
+            "status": "pass",
+            "section": "Gaming stack",
+            "message": "GameMode present (native)"
+        },
+        {
+            "status": "pass",
+            "section": "Gaming stack",
+            "message": "gamescope present (native)"
+        },
+        {
+            "status": "pass",
+            "section": "Gaming stack",
+            "message": "MangoHud present"
+        },
+        {
+            "status": "pass",
+            "section": "Flatpaks",
+            "message": "Flathub remote configured"
+        },
+        {
+            "status": "pass",
+            "section": "Flatpaks",
+            "message": "sageos-flatpak-setup enabled"
+        },
+        {
+            "status": "warn",
+            "section": "Flatpaks",
+            "message": "sageos flatpak list not yet applied (first boot pending / no network yet)"
+        },
+        {
+            "status": "warn",
+            "section": "Flatpaks",
+            "message": "flatpak not installed yet: com.heroicgameslauncher.hgl"
+        },
+        {
+            "status": "warn",
+            "section": "Flatpaks",
+            "message": "flatpak not installed yet: net.lutris.Lutris"
+        },
+        {
+            "status": "warn",
+            "section": "Flatpaks",
+            "message": "flatpak not installed yet: com.usebottles.bottles"
+        },
+        {
+            "status": "warn",
+            "section": "Flatpaks",
+            "message": "flatpak not installed yet: org.libreoffice.LibreOffice"
+        },
+        {
+            "status": "pass",
+            "section": "Services",
+            "message": "podman.socket enabled"
+        },
+        {
+            "status": "pass",
+            "section": "Updates & integrity",
+            "message": "uupd present"
+        },
+        {
+            "status": "pass",
+            "section": "Updates & integrity",
+            "message": "automatic updates armed (uupd.timer)"
+        },
+        {
+            "status": "pass",
+            "section": "Updates & integrity",
+            "message": "rpm-ostree auto policy none (uupd owns updates, no double-update)"
+        },
+        {
+            "status": "pass",
+            "section": "Updates & integrity",
+            "message": "image signature enforced for ghcr.io/sageajnz-create/sageos"
+        },
+        {
+            "status": "pass",
+            "section": "Updates & integrity",
+            "message": "booted deployment pinned \u2014 rollback point guaranteed"
+        },
+        {
+            "status": "pass",
+            "section": "Updates & integrity",
+            "message": "greenboot health checks enabled"
+        }
+    ]
+}

@@ -1,0 +1,13 @@
+2026-09-01T17:23:34+00:00 bazzite systemd[1]: Starting ostree-prepare-root.service - OSTree Prepare OS/...
+2026-09-01T17:23:34+00:00 bazzite ostree-prepare-root[490]: Resolved OSTree target to: /sysroot/ostree/deploy/default/deploy/ba8d7705d8cba82fa1c6b7e8185ba8514e1a4d5ececc4f824b9885c345ef2a6e.1
+2026-09-01T17:23:34+00:00 bazzite ostree-prepare-root[490]: sysroot.readonly configuration value: 1 (fs writable: 1)
+2026-09-01T17:23:34+00:00 bazzite ostree-prepare-root[490]: composefs: mounted successfully (verity=false)
+2026-09-01T17:23:34+00:00 bazzite ostree-prepare-root[490]: Resolved OSTree target to: /sysroot.tmp/sysroot/ostree/deploy/default/deploy/ba8d7705d8cba82fa1c6b7e8185ba8514e1a4d5ececc4f824b9885c345ef2a6e.1
+2026-09-01T17:23:34+00:00 bazzite systemd[1]: Finished ostree-prepare-root.service - OSTree Prepare OS/.
+2026-09-01T17:23:37+00:00 bazzite systemd[1]: ostree-prepare-root.service: Deactivated successfully.
+2026-09-01T17:23:37+00:00 bazzite systemd[1]: Stopped ostree-prepare-root.service - OSTree Prepare OS/.
+2026-09-01T17:23:40+00:00 bazzite systemd[1]: Starting sageos-pin.service - SageOS: pin the running deployment as the rollback point...
+2026-09-01T17:23:41+00:00 bazzite rpm-ostree[855]: client(id:cli dbus:1.15 unit:sageos-pin.service uid:0) added; new total=1
+2026-09-01T17:23:41+00:00 bazzite rpm-ostree[855]: client(id:cli dbus:1.15 unit:sageos-pin.service uid:0) vanished; remaining=0
+2026-09-01T17:23:42+00:00 bazzite systemd[1]: Finished sageos-pin.service - SageOS: pin the running deployment as the rollback point.
+2026-09-01T17:23:42+00:00 bazzite audit[1]: SERVICE_START pid=1 uid=0 auid=4294967295 ses=4294967295 subj=system_u:system_r:init_t:s0 msg='unit=sageos-pin comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'

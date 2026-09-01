@@ -104,17 +104,20 @@ bundles while adding GUI previews, validation, migrations, and undo history.
 - Add container structure tests for files, modes, services, policy, and ujust.
   (done; `scripts/validate-image.sh` passed in PR CI on 2026-08-31)
 - Automate qcow2 boot, login, `sageos-doctor`, journal capture, and artifact
-  publication; make failures reproducible locally. (implemented. PR #8 and
-  post-merge/scheduled image publishes are green; remaining gate is chained
-  qcow2 run 33535434052. Live pointers: `docs/evidence/phase6a/README.md`)
+  publication; make failures reproducible locally. (done: scheduled image
+  [33520770178](https://github.com/sageajnz-create/sageos/actions/runs/33520770178)
+  chained to qcow2
+  [33535434052](https://github.com/sageajnz-create/sageos/actions/runs/33535434052)
+  with `"healthy": true`. Archive: `docs/evidence/phase6a/`)
 - Add SBOM, vulnerability scanning, provenance, recovery-key documentation,
-  and a security disclosure policy. (implemented; vulnerability reporting is
-  non-blocking until the first image baseline is triaged)
+  and a security disclosure policy. (implemented; first published Grype
+  report has `matches: []` with `only-fixed: true`; a blocking severity gate
+  still waits on triage)
 - Resolve executable-bit inconsistency for shipped scripts and tests. (done:
   enforced by `tests/test-image-structure.sh`)
 
 Exit: every pull request gets offline tests and an image build; scheduled CI
-boots a VM and produces machine-readable health results.
+boots a VM and produces machine-readable health results. **Met 2026-09-01.**
 
 ### Phase 6B — consumer desktop foundation
 
@@ -179,7 +182,8 @@ compatibility, performance, and hardware gates.
 ## First three milestones
 
 1. **Reliable VM gate:** structure-test the image and automatically boot the
-   qcow2 in CI, run `sageos-doctor --json`, and archive journals.
+   qcow2 in CI, run `sageos-doctor --json`, and archive journals. (done
+   2026-09-01; see `docs/evidence/phase6a/`)
 2. **Control Center vertical slice:** hardware summary, update status, rollback,
    and diagnostics through a minimal D-Bus service with no AI dependency.
 3. **Customization vertical slice:** one theme/layout profile applied through
@@ -202,42 +206,42 @@ agent safe tools to use and gives users a complete non-AI recovery path.
 
 ## Current progress and prioritized execution plan
 
-Snapshot: 2026-09-01. Phase 6A is **not closed**. Do not start Phase 6B /
-Control Center until the chained qcow2 row in
-`docs/evidence/phase6a/README.md` is green.
+Snapshot: 2026-09-01. Phase 6A **evidence is archived**. Phase 6B / Control
+Center is **not started**.
 
-1. **Close the Phase 6A evidence set (in progress).** PR #8 is merged at
-   `ba734b4`. PR image
+1. **Phase 6A evidence set (done).** PR #8 merged at `ba734b4`. PR image
    [33491763846](https://github.com/sageajnz-create/sageos/actions/runs/33491763846)
    and PR disk
    [33491763845](https://github.com/sageajnz-create/sageos/actions/runs/33491763845)
-   are green. Post-merge push image
+   were green. Post-merge push image
    [33515917012](https://github.com/sageajnz-create/sageos/actions/runs/33515917012)
    published `sha256:111533ed04e9b0836b7046a006d15edf177bbd64b8ecbe0bb69ce360a8a80c3a`.
    Scheduled image
    [33520770178](https://github.com/sageajnz-create/sageos/actions/runs/33520770178)
    published `sha256:a98c409012f60ec526788cb7ca710d5959599b4981bf466322006a03ef2e0be5`
-   (SBOM + Grype `matches: []` with `only-fixed: true` + provenance
+   (SBOM `sageos-sbom-33520770178`, Grype `matches: []` with `only-fixed: true`,
+   provenance
    [44474222](https://github.com/sageajnz-create/sageos/attestations/44474222)).
-   The remaining gate is the chained qcow2
-   [33535434052](https://github.com/sageajnz-create/sageos/actions/runs/33535434052),
-   which was still running when this snapshot was written. Do not call Phase
-   6A done until that run’s `doctor.json` is archived. Fetch commands:
-   `docs/evidence/phase6a/README.md`.
-2. **Triage the first supply-chain baseline.** Classify fixable vulnerabilities
-   inherited from Bazzite/Fedora, record accepted upstream risk with expiry
-   dates, and only then choose a documented severity gate. Keep the generated
-   SBOM and report non-blocking until that baseline exists. Do this after the
-   post-merge image scan exists; do not invent scanner output.
+   Chained qcow2
+   [33535434052](https://github.com/sageajnz-create/sageos/actions/runs/33535434052)
+   booted that `latest` with `doctor.json` `"healthy": true` (`15` pass /
+   `10` warn / `0` fail; pin service succeeded). Snapshots and fetch commands:
+   `docs/evidence/phase6a/`.
+2. **Triage the first supply-chain baseline.** The first published Grype
+   reports exist (see `docs/evidence/phase6a/`). Classify remaining
+   inherited Bazzite/Fedora risk with expiry dates, then choose a documented
+   severity gate. Keep the scan non-blocking until that baseline exists. Do
+   not invent scanner output.
 3. **Complete hardware validation.** Run the Phase 1/3/4/5 checklists on the
    reference AMD machine and record image digest, PCI IDs, firmware, kernel,
    display/audio/controller results, rollback behavior, and known limitations.
    Intel and NVIDIA remain explicitly unverified until equivalent evidence is
    captured.
-4. **Start Phase 6B with one vertical slice (not started).** Wait for item 1.
-   Then decide the Control Center/service toolkit, write the versioned
-   read-only system-status contract, and build one UI path covering hardware
-   summary, current image/channel, update state, rollback availability, and
+4. **Start Phase 6B with one vertical slice (not started).** Do not begin
+   this until you intentionally open a new Phase 6B change. Then decide the
+   Control Center/service toolkit, write the versioned read-only
+   system-status contract, and build one UI path covering hardware summary,
+   current image/channel, update state, rollback availability, and
    diagnostics export. Do not add privileged mutations until preview,
    authorization, audit, and undo contracts are tested.
 5. **Add the first-boot shell and policy gates.** Once the vertical slice is
@@ -245,8 +249,7 @@ Control Center until the chained qcow2 row in
    opt-in, and branded defaults expressed as a declarative profile rather than
    scattered immutable-image edits.
 
-The Phase 6A exit gate is objective: PR image validation is green (done on
-PR #8); completion still requires one green scheduled image publication
-followed by its chained qcow2 boot with a healthy machine-readable doctor
-report, archived under `docs/evidence/phase6a/`. Phase 6B implementation
-should not be declared started until that evidence is archived.
+The Phase 6A exit gate is met (2026-09-01): PR image validation is green, and
+a scheduled image publication plus its chained qcow2 boot produced a healthy
+machine-readable doctor report, archived under `docs/evidence/phase6a/`.
+Phase 6B implementation is **not started**.
