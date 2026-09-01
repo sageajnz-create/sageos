@@ -138,12 +138,12 @@ jobs:
               --pull=never \
               --tag "${BIB_BUILD_IMAGE}" \
               --file disk_config/Containerfile.buildroot \
-              disk_config
+              .
             BUILD_CONTAINER_ARGS=(--build-container "${BIB_BUILD_IMAGE}")
           fi
           # osbuild replaces /etc with its build container inside bubblewrap.
-          # QCOW2 therefore uses a clean policy plus the btrfs tooling it needs;
-          # Anaconda ISO retains the source's Fedora package/build root.
+          # QCOW2 therefore uses the SageOS policy/key plus mkfs.btrfs;
+          # Anaconda ISO retains the source image as the nested build root.
           sudo podman run \
             --rm \
             --privileged \

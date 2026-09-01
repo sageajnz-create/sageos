@@ -104,6 +104,14 @@ expect {
     timeout { puts stderr "VM doctor payload was not executable"; exit 1 }
 }
 
+# osbuild's nested build root can leave /etc/containers from Fedora while the
+# SageOS defaults live in /usr/etc. Deploy those defaults before doctor runs.
+send "echo sageos | sudo -S bash -c 'ls -l /etc/containers/policy.json /usr/etc/containers/policy.json /etc/pki/containers/cosign.pub /usr/etc/pki/containers/cosign.pub; mkdir -p /etc/containers /etc/pki/containers; if grep -Fq sigstoreSigned /usr/etc/containers/policy.json && ! grep -Fq sigstoreSigned /etc/containers/policy.json; then cp -a /usr/etc/containers/policy.json /etc/containers/policy.json; cp -a /usr/etc/pki/containers/cosign.pub /etc/pki/containers/cosign.pub; echo repaired; fi'; echo __SAGEOS_POLICY_READY__\r"
+expect {
+    -re {__SAGEOS_POLICY_READY__} {}
+    timeout { puts stderr "VM policy probe timed out"; exit 1 }
+}
+
 send "echo __SAGEOS_DOCTOR_BEGIN__; /tmp/sageos-doctor-ci --json; rc=\$?; echo __SAGEOS_DOCTOR_END__:\$rc\r"
 set timeout $command_timeout
 expect {

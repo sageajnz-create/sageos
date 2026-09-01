@@ -84,6 +84,16 @@ grep -Fq 'FROM quay.io/fedora/fedora-bootc:42' "${buildroot}" \
     || fail "QCOW2 build root does not match the Bazzite Fedora generation"
 grep -Fq 'dnf install -y btrfs-progs' "${buildroot}" \
     || fail "QCOW2 build root does not provide mkfs.btrfs"
+grep -Fq 'COPY system_files/etc/containers/policy.json /etc/containers/policy.json' "${buildroot}" \
+    || fail "QCOW2 build root does not include the SageOS signature policy"
+grep -Fq 'COPY system_files/etc/pki/containers/cosign.pub /etc/pki/containers/cosign.pub' "${buildroot}" \
+    || fail "QCOW2 build root does not include the Cosign public key"
+grep -Fq -- '--file disk_config/Containerfile.buildroot' "${build_disk}" \
+    && grep -A2 -- '--file disk_config/Containerfile.buildroot' "${build_disk}" | grep -Eq '^[[:space:]]+\.$' \
+    || fail "disk workflow does not build the nested root from the repository root"
+grep -Fq -- '--file disk_config/Containerfile.buildroot' "${justfile}" \
+    && grep -A2 -- '--file disk_config/Containerfile.buildroot' "${justfile}" | grep -Eq '^[[:space:]]+\.$' \
+    || fail "local disk builds do not build the nested root from the repository root"
 validator="${repo_root}/scripts/validate-qcow2.exp"
 grep -Fq 'set login_timeout 1800' "${validator}" \
     || fail "VM validator does not allow the first-boot provisioning reboot to finish"
@@ -96,6 +106,8 @@ grep -Fq 'OVMF_VARS' "${validator}" \
     || fail "VM validator does not persist UEFI variables across the first-boot reboot"
 grep -Fq '/tmp/sageos-doctor-ci' "${validator}" \
     || fail "VM validator does not run this checkout's doctor inside the guest"
+grep -Fq '__SAGEOS_POLICY_READY__' "${validator}" \
+    || fail "VM validator does not deploy the image signature policy into /etc before doctor"
 if grep -Fq "< '\$serial_log'" "${validator}"; then
     fail "VM validator still opens the serial log through a quoted shell redirect"
 fi

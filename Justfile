@@ -351,7 +351,7 @@ _build-bib $target_image $tag $type $config: (_rootful_load_image target_image t
         --pull=never \
         --tag "{{ bib_build_image }}" \
         --file disk_config/Containerfile.buildroot \
-        disk_config
+        .
       BUILD_CONTAINER_ARGS=(--build-container "{{ bib_build_image }}")
     fi
 
