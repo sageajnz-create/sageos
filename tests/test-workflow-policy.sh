@@ -90,6 +90,10 @@ grep -Fq 'set login_timeout 1800' "${validator}" \
 if grep -Fq -- '-no-reboot' "${validator}"; then
     fail "VM validator exits during the expected first-boot provisioning reboot"
 fi
+grep -Fq 'signal=off' "${validator}" \
+    || fail "VM validator lets the serial PTY hang up during the first-boot reboot"
+grep -Fq 'OVMF_VARS' "${validator}" \
+    || fail "VM validator does not persist UEFI variables across the first-boot reboot"
 grep -Fq 'sudo chmod 0666 /dev/kvm' "${build_disk}" \
     || fail "disk workflow does not enable KVM acceleration for the VM gate"
 # The nightly VM check must consume the image from a completed scheduled build,
