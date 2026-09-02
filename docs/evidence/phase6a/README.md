@@ -41,7 +41,9 @@ That restriction is intentional (see `tests/test-workflow-policy.sh`).
 | SBOM + vuln report + provenance for the scheduled digest | Archived as pointers + compact Grype copy | See tables below; doctor snapshot [`chained-qcow2-doctor.json`](chained-qcow2-doctor.json) |
 
 Phase 6B / Control Center remains **not started**. Next work is supply-chain
-triage and hardware checklists, not a GUI.
+triage ([docs/supply-chain.md](../../supply-chain.md): inherited
+Bazzite/Fedora policy, review/expiry cadence, proposed non-blocking
+severity-gate criteria) and then hardware checklists, not a GUI.
 
 ## PR #8 qcow2 doctor (real output)
 
