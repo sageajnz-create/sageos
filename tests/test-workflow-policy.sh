@@ -32,6 +32,10 @@ grep -Fq 'just validate-image "${IMAGE_NAME}:${DEFAULT_TAG}"' "${build}" \
     || fail "assembled image validation missing"
 grep -Fq 'sbom: sageos.spdx.json' "${build}" || fail "vulnerability scan does not consume the generated SBOM"
 grep -Fq 'fail-build: false' "${build}" || fail "scan mode changed without updating the baseline policy test"
+supply="${repo_root}/docs/supply-chain.md"
+grep -Fq 'fail-build: false' "${supply}" || fail "supply-chain.md no longer documents non-blocking Grype"
+grep -Fq 'evidence/phase6a/scheduled-image-vulns-summary.json' "${supply}" \
+    || fail "supply-chain.md does not point at the Phase 6A Grype compact copy"
 grep -Fq 'needs: build_push' "${build}" || fail "supply-chain scan is not isolated from the build job"
 # These are intentionally literal workflow-shell expressions.
 # shellcheck disable=SC2016

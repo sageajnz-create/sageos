@@ -111,8 +111,9 @@ bundles while adding GUI previews, validation, migrations, and undo history.
   with `"healthy": true`. Archive: `docs/evidence/phase6a/`)
 - Add SBOM, vulnerability scanning, provenance, recovery-key documentation,
   and a security disclosure policy. (implemented; first published Grype
-  report has `matches: []` with `only-fixed: true`; a blocking severity gate
-  still waits on triage)
+  report has `matches: []` with `only-fixed: true`. Triage policy and a
+  proposed, **not enabled**, severity gate are in `docs/supply-chain.md`.
+  CI stays `fail-build: false`.)
 - Resolve executable-bit inconsistency for shipped scripts and tests. (done:
   enforced by `tests/test-image-structure.sh`)
 
@@ -206,8 +207,9 @@ agent safe tools to use and gives users a complete non-AI recovery path.
 
 ## Current progress and prioritized execution plan
 
-Snapshot: 2026-09-01. Phase 6A **evidence is archived**. Phase 6B / Control
-Center is **not started**.
+Snapshot: 2026-09-02. Phase 6A **exit is archived**. Next work is
+**supply-chain triage**, then hardware checklists. Phase 6B / Control Center
+is **not started**.
 
 1. **Phase 6A evidence set (done).** PR #8 merged at `ba734b4`. PR image
    [33491763846](https://github.com/sageajnz-create/sageos/actions/runs/33491763846)
@@ -227,11 +229,14 @@ Center is **not started**.
    booted that `latest` with `doctor.json` `"healthy": true` (`15` pass /
    `10` warn / `0` fail; pin service succeeded). Snapshots and fetch commands:
    `docs/evidence/phase6a/`.
-2. **Triage the first supply-chain baseline.** The first published Grype
-   reports exist (see `docs/evidence/phase6a/`). Classify remaining
-   inherited Bazzite/Fedora risk with expiry dates, then choose a documented
-   severity gate. Keep the scan non-blocking until that baseline exists. Do
-   not invent scanner output.
+2. **Triage the first supply-chain baseline (current).** Phase 6A archived
+   the scheduled Grype compact copy
+   (`docs/evidence/phase6a/scheduled-image-vulns-summary.json`:
+   `match_count` `0`, `only_fixed: true`). Policy, review/expiry cadence, and
+   proposed (not enabled) severity-gate criteria are in
+   `docs/supply-chain.md`. Keep Grype `fail-build: false` until a later PR
+   implements that gate. Do not invent scanner output. After this triage
+   process is in use, hardware checklists are next.
 3. **Complete hardware validation.** Run the Phase 1/3/4/5 checklists on the
    reference AMD machine and record image digest, PCI IDs, firmware, kernel,
    display/audio/controller results, rollback behavior, and known limitations.
