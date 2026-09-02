@@ -21,8 +21,11 @@ package SBOM but do not run the post-publication vulnerability-report job.
 The scanner initially runs in report-only mode. SageOS inherits a large package
 set from Bazzite and Fedora, so a release-blocking threshold must be based on a
 reviewed baseline, ownership, fix availability, exploitability, and documented
-VEX decisions—not an arbitrary severity count. Moving to a blocking gate is a
-Phase 6A exit task after the first reports have been triaged.
+VEX decisions—not an arbitrary severity count. The first published reports are
+pointed from [evidence/phase6a/README.md](evidence/phase6a/README.md) (scheduled
+image run 33520770178, Grype `matches: []` with `only-fixed: true`). Moving to
+a blocking gate still waits on that triage. Do not treat a pull-request SBOM as
+the release baseline (PR builds do not run the vulnerability job).
 
 ## Verifying an image
 
