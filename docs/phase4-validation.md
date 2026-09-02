@@ -1,6 +1,9 @@
 # Phase 4 validation — gaming stack & compatibility layers
 
 Real hardware required for anything past #3. Prereq: phases 1–3 validated.
+Record digest / PCI / firmware / kernel on the AMD box in
+[evidence/hardware/amd-rx6650xt/TEMPLATE.md](evidence/hardware/amd-rx6650xt/TEMPLATE.md)
+([collection commands](evidence/hardware/README.md)).
 
 | # | Check | Method | Pass criteria |
 |---|---|---|---|
@@ -22,6 +25,6 @@ Real hardware required for anything past #3. Prereq: phases 1–3 validated.
 
 ## Run log
 
-| Date | Image tag | Check # | Result | Notes |
-|---|---|---|---|---|
-| | | | | |
+| Date | Image tag | Digest | PCI IDs | Firmware | Kernel | Check # | Result | Notes |
+|---|---|---|---|---|---|---|---|---|
+| | | | | | | | | |

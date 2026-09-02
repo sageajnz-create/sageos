@@ -4,6 +4,11 @@ Run on a SageOS image (VM for structure checks, **real hardware for anything
 involving the GPU, displays, or audio**). Extends, not replaces,
 [phase1-validation.md](phase1-validation.md).
 
+On the reference AMD machine, copy identity and results into
+[evidence/hardware/amd-rx6650xt/TEMPLATE.md](evidence/hardware/amd-rx6650xt/TEMPLATE.md).
+How to collect digest / PCI / firmware / kernel:
+[evidence/hardware/README.md](evidence/hardware/README.md).
+
 ## Image structure (VM is fine)
 
 | # | Check | Command | Pass criteria |
@@ -49,6 +54,6 @@ involving the GPU, displays, or audio**). Extends, not replaces,
 
 ## Run log
 
-| Date | Image tag | Section | Result | Notes |
-|---|---|---|---|---|
-| | | | | |
+| Date | Image tag | Digest | PCI IDs | Firmware | Kernel | Section | Result | Notes |
+|---|---|---|---|---|---|---|---|---|
+| | | | | | | | | |

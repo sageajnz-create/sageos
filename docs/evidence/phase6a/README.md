@@ -40,10 +40,10 @@ That restriction is intentional (see `tests/test-workflow-policy.sh`).
 | Scheduled/chained qcow2 of that `latest` | **Green** | [run 33535434052](https://github.com/sageajnz-create/sageos/actions/runs/33535434052) (`workflow_run` after the scheduled image) |
 | SBOM + vuln report + provenance for the scheduled digest | Archived as pointers + compact Grype copy | See tables below; doctor snapshot [`chained-qcow2-doctor.json`](chained-qcow2-doctor.json) |
 
-Phase 6B / Control Center remains **not started**. Next work is supply-chain
-triage ([docs/supply-chain.md](../../supply-chain.md): inherited
-Bazzite/Fedora policy, review/expiry cadence, proposed non-blocking
-severity-gate criteria) and then hardware checklists, not a GUI.
+Phase 6B / Control Center remains **not started**. Supply-chain triage
+policy is on main ([docs/supply-chain.md](../../supply-chain.md)). Next
+physical work is filling the AMD hardware packet
+([docs/evidence/hardware/](../hardware/README.md)), not a GUI.
 
 ## PR #8 qcow2 doctor (real output)
 

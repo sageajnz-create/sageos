@@ -207,9 +207,9 @@ agent safe tools to use and gives users a complete non-AI recovery path.
 
 ## Current progress and prioritized execution plan
 
-Snapshot: 2026-09-02. Phase 6A **exit is archived**. Next work is
-**supply-chain triage**, then hardware checklists. Phase 6B / Control Center
-is **not started**.
+Snapshot: 2026-09-02. Phase 6A **exit is archived**. Supply-chain triage
+**policy is on main** (PR #10). **Next physical work is filling**
+`docs/evidence/hardware/`. Phase 6B / Control Center is **not started**.
 
 1. **Phase 6A evidence set (done).** PR #8 merged at `ba734b4`. PR image
    [33491763846](https://github.com/sageajnz-create/sageos/actions/runs/33491763846)
@@ -229,19 +229,22 @@ is **not started**.
    booted that `latest` with `doctor.json` `"healthy": true` (`15` pass /
    `10` warn / `0` fail; pin service succeeded). Snapshots and fetch commands:
    `docs/evidence/phase6a/`.
-2. **Triage the first supply-chain baseline (current).** Phase 6A archived
-   the scheduled Grype compact copy
+2. **Triage the first supply-chain baseline (policy landed, PR #10).**
+   Phase 6A archived the scheduled Grype compact copy
    (`docs/evidence/phase6a/scheduled-image-vulns-summary.json`:
    `match_count` `0`, `only_fixed: true`). Policy, review/expiry cadence, and
    proposed (not enabled) severity-gate criteria are in
    `docs/supply-chain.md`. Keep Grype `fail-build: false` until a later PR
-   implements that gate. Do not invent scanner output. After this triage
-   process is in use, hardware checklists are next.
-3. **Complete hardware validation.** Run the Phase 1/3/4/5 checklists on the
-   reference AMD machine and record image digest, PCI IDs, firmware, kernel,
-   display/audio/controller results, rollback behavior, and known limitations.
-   Intel and NVIDIA remain explicitly unverified until equivalent evidence is
-   captured.
+   implements that gate. Do not invent scanner output. Ongoing 14-day review
+   stays in that doc. Next physical work is hardware.
+3. **Complete hardware validation (current).** Templates are in
+   `docs/evidence/hardware/`. Fill the AMD RX 6650 XT packet on the
+   reference machine: immutable image digest, PCI IDs, firmware, kernel,
+   display/audio/controller results, rollback behavior, known limitations,
+   Phase 1 machine record, and Phase 1/3/4/5 result tables. Collection
+   commands are in `docs/evidence/hardware/README.md`. Do not invent filled
+   results. Intel and NVIDIA remain explicitly unverified until equivalent
+   packets exist. This is not Phase 6B.
 4. **Start Phase 6B with one vertical slice (not started).** Do not begin
    this until you intentionally open a new Phase 6B change. Then decide the
    Control Center/service toolkit, write the versioned read-only
