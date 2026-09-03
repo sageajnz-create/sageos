@@ -50,6 +50,12 @@ PYEOF
 
 grep -Fqx 'import "/usr/share/ublue-os/just/70-sageos.just"' /usr/share/ublue-os/justfile \
     || fail "SageOS ujust import missing from assembled image"
+
+/usr/bin/just --unstable --justfile /usr/share/ublue-os/justfile --list >/dev/null \
+    || fail "ujust justfile does not parse (NUL/encoding corruption?)"
+ujust --show sageos-doctor >/dev/null 2>&1 \
+    || /usr/bin/just --unstable --justfile /usr/share/ublue-os/justfile --show sageos-doctor >/dev/null \
+    || fail "sageos-doctor recipe not accessible via ujust"
 grep -Fq 'PRETTY_NAME="SageOS 0.1 (built on Bazzite)"' /usr/lib/os-release \
     || fail "SageOS branding missing from assembled image"
 grep -Fq 'NAME=SageOS' /etc/sageos-release || fail "SageOS release identity missing"

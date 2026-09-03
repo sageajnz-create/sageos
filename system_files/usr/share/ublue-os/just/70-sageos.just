@@ -14,7 +14,7 @@ sageos-version:
     @echo
     @rpm-ostree status --booted 2>/dev/null || bootc status 2>/dev/null || true
 
-# Update everything now — the same run the automatic timer does
+# Update everything now -- the same run the automatic timer does
 # (system image via bootc/rpm-ostree, then flatpaks)
 [group("SageOS")]
 sageos-update:

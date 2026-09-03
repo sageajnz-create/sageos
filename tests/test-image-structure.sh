@@ -89,4 +89,18 @@ for recipe in sageos-doctor sageos-version sageos-update sageos-rollback; do
     assert_contains "${just_recipes}" "${recipe}:"
 done
 
+while IFS= read -r -d '' justfile; do
+    if grep -Pq '\x00' "${justfile}"; then
+        fail "NUL byte in shipped just file: ${justfile#"${REPO_ROOT}/"}"
+    fi
+    if LC_ALL=C grep -Pn '[^\x00-\x7F]' "${justfile}" >/dev/null; then
+        fail "non-ASCII byte in shipped just file: ${justfile#"${REPO_ROOT}/"}"
+    fi
+done < <(find "${REPO_ROOT}" -name '*.just' -print0)
+
+if command -v just >/dev/null 2>&1; then
+    just --unstable --justfile "${just_recipes}" --list >/dev/null \
+        || fail "70-sageos.just does not parse cleanly"
+fi
+
 echo "image structure PASS: executables, units, signing, Flatpaks, and ujust wiring"
