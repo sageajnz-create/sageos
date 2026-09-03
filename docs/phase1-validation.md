@@ -4,6 +4,11 @@ Run on stock Bazzite (live USB or test install) on the target machine, and
 re-run against every SageOS image before promoting it. Record results per run.
 
 Machine: AMD CPU + Radeon RX 6650 XT (Navi 23) — fill in exact specs below.
+The canonical fill-in packet (digest, PCI IDs, firmware, kernel, machine
+record, and per-check results) is
+[evidence/hardware/amd-rx6650xt/TEMPLATE.md](evidence/hardware/amd-rx6650xt/TEMPLATE.md).
+Collection commands: [evidence/hardware/README.md](evidence/hardware/README.md).
+Do not invent filled results.
 
 | # | Check | Command / method | Pass criteria |
 |---|---|---|---|
@@ -27,6 +32,10 @@ Machine: AMD CPU + Radeon RX 6650 XT (Navi 23) — fill in exact specs below.
 
 ## Machine record
 
+Fill the same fields in
+[evidence/hardware/amd-rx6650xt/TEMPLATE.md](evidence/hardware/amd-rx6650xt/TEMPLATE.md)
+when recording a hardware run. Leave these bullets empty rather than guessing.
+
 - CPU:
 - Motherboard / chipset:
 - RAM:
@@ -37,6 +46,9 @@ Machine: AMD CPU + Radeon RX 6650 XT (Navi 23) — fill in exact specs below.
 
 ## Run log
 
-| Date | Image | Result | Notes |
-|---|---|---|---|
-| | bazzite:stable (baseline) | | |
+Record the immutable booted digest (`sha256:…`), not the moving `latest` tag.
+PCI / firmware / kernel: paste short values from the hardware packet.
+
+| Date | Image tag | Digest | PCI IDs | Firmware | Kernel | Result | Notes |
+|---|---|---|---|---|---|---|---|
+| | bazzite:stable (baseline) | | | | | | |

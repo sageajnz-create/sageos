@@ -1,7 +1,10 @@
 # Phase 5 validation — system services, rollback & update policy
 
 Mostly VM-checkable; nothing here strictly needs real hardware. Prereq:
-phases 1–4 validated.
+phases 1–4 validated. When this run is on the reference AMD machine, still
+record digest / PCI / firmware / kernel in
+[evidence/hardware/amd-rx6650xt/TEMPLATE.md](evidence/hardware/amd-rx6650xt/TEMPLATE.md)
+([collection commands](evidence/hardware/README.md)).
 
 | # | Check | Method | Pass criteria |
 |---|---|---|---|
@@ -19,6 +22,6 @@ phases 1–4 validated.
 
 ## Run log
 
-| Date | Image tag | Check # | Result | Notes |
-|---|---|---|---|---|
-| | | | | |
+| Date | Image tag | Digest | PCI IDs | Firmware | Kernel | Check # | Result | Notes |
+|---|---|---|---|---|---|---|---|---|
+| | | | | | | | | |

@@ -39,7 +39,7 @@ rollback consequence before changing it.
 
 | Hardware | Current status | Release claim |
 |---|---|---|
-| AMD Radeon using Mesa RADV | Primary target | Automated software checks; RX 6650 XT hardware validation still required |
+| AMD Radeon using Mesa RADV | Primary target | Automated software checks; RX 6650 XT packet template exists, hardware validation still required |
 | Intel integrated/discrete graphics | Expected through the Bazzite base | Not SageOS hardware-verified yet |
 | NVIDIA GPUs | Expected through Bazzite's supported NVIDIA path | Not SageOS hardware-verified yet; no blanket hybrid-laptop claim |
 | Handhelds, HDR/VRR, docks, suspend | Candidate configurations | No support claim until entered in the hardware matrix with evidence |
@@ -62,3 +62,8 @@ Feature and hardware status use three distinct labels:
 Absence from the hardware-verified matrix means unverified, not necessarily
 broken. Compatibility reports must include the image digest, hardware IDs,
 firmware version, kernel version, and checklist result.
+
+Packets and collection commands live in
+[evidence/hardware/](evidence/hardware/README.md). The RX 6650 XT template is
+empty until a physical run is recorded. Intel and NVIDIA remain unverified
+until equivalent packets exist.

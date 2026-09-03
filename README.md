@@ -5,9 +5,11 @@ Gaming-first, atomic, daily-driver Linux for x86_64 PCs. Built as a custom
 [Bazzite](https://bazzite.gg) (Fedora Atomic + Universal Blue).
 
 **Status: Phase 6A exit is archived** under
-[docs/evidence/phase6a/](docs/evidence/phase6a/README.md). **Next work is
-supply-chain triage** ([docs/supply-chain.md](docs/supply-chain.md)), then
-hardware checklists. Phase 6B / Control Center is not started. See
+[docs/evidence/phase6a/](docs/evidence/phase6a/README.md). Supply-chain
+triage **policy is on main** ([docs/supply-chain.md](docs/supply-chain.md),
+PR #10). **Next physical work is filling the AMD hardware evidence
+packet** ([docs/evidence/hardware/](docs/evidence/hardware/README.md)).
+Phase 6B / Control Center is not started. See
 [docs/development-plan.md](docs/development-plan.md) for the current execution
 plan and [docs/roadmap.md](docs/roadmap.md) for validated product milestones.
 
