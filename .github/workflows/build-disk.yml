@@ -107,8 +107,10 @@ jobs:
 
           POLICY_FILE="${GITHUB_WORKSPACE}/system_files/etc/containers/policy.json"
           PUBLIC_KEY="${GITHUB_WORKSPACE}/system_files/etc/pki/containers/cosign.pub"
+          REGISTRIES_D_FILE="${GITHUB_WORKSPACE}/system_files/etc/containers/registries.d/ghcr.io-sageajnz-create-sageos.yaml"
           python3 -m json.tool "${POLICY_FILE}" >/dev/null
           test -s "${PUBLIC_KEY}"
+          test -s "${REGISTRIES_D_FILE}"
           echo "${GH_TOKEN}" | docker login ghcr.io \
             --username "${GITHUB_ACTOR}" \
             --password-stdin
@@ -142,7 +144,7 @@ jobs:
             BUILD_CONTAINER_ARGS=(--build-container "${BIB_BUILD_IMAGE}")
           fi
           # osbuild replaces /etc with its build container inside bubblewrap.
-          # QCOW2 therefore uses the SageOS policy/key plus mkfs.btrfs;
+          # QCOW2 therefore uses the SageOS policy/key/registries.d plus mkfs.btrfs;
           # Anaconda ISO retains the source image as the nested build root.
           sudo podman run \
             --rm \
@@ -153,6 +155,7 @@ jobs:
             --volume "${CONFIG_FILE}:/config.toml:ro" \
             --volume "${POLICY_FILE}:/etc/containers/policy.json:ro" \
             --volume "${PUBLIC_KEY}:/etc/pki/containers/cosign.pub:ro" \
+            --volume "${REGISTRIES_D_FILE}:/etc/containers/registries.d/ghcr.io-sageajnz-create-sageos.yaml:ro" \
             "${BIB_IMAGE}" \
             build \
             --output /output \
