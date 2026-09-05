@@ -55,273 +55,274 @@ ok()  { printf '  \033[1;32mPASS\033[0m  %s\n' "$*"; }
 
 if [[ "${EUID}" -ne 0 ]]; then
     die "run with sudo. This writes ${POLICY_PATH}, ${KEY_PATH}, and ${REGISTRIES_D_PATH}."
+fi
+
+# --------------------------------------------------------------------------
+# undo
+# --------------------------------------------------------------------------
+if [[ "${1:-}" == "--undo" ]]; then
+    say "Undo, restoring from ${BACKUP}"
+    [[ -d "${BACKUP}" ]] || die "no backup directory at ${BACKUP}. Nothing to restore."
+    [[ -f "${BACKUP}/policy.json.before" ]] || die "missing ${BACKUP}/policy.json.before"
+    [[ -f "${BACKUP}/cosign.pub.before" ]] || die "missing ${BACKUP}/cosign.pub.before"
+
+    cp -a "${BACKUP}/policy.json.before" "${POLICY_PATH}.sageos-undo"
+    mv -T "${POLICY_PATH}.sageos-undo" "${POLICY_PATH}"
+    cp -a "${BACKUP}/cosign.pub.before" "${KEY_PATH}.sageos-undo"
+    mv -T "${KEY_PATH}.sageos-undo" "${KEY_PATH}"
+    command -v restorecon >/dev/null 2>&1 && restorecon "${POLICY_PATH}" "${KEY_PATH}" || true
+
+    # registries.d: restore prior file, or remove if we created it
+    if [[ -f "${BACKUP}/registries.d.created" ]]; then
+        rm -f "${REGISTRIES_D_PATH}"
+        ok "removed ${REGISTRIES_D_PATH} (was created by this repair)"
+    elif [[ -f "${BACKUP}/registries.d.before" ]]; then
+        cp -a "${BACKUP}/registries.d.before" "${REGISTRIES_D_PATH}.sageos-undo"
+        mv -T "${REGISTRIES_D_PATH}.sageos-undo" "${REGISTRIES_D_PATH}"
+        command -v restorecon >/dev/null 2>&1 && restorecon "${REGISTRIES_D_PATH}" || true
+        ok "restored ${REGISTRIES_D_PATH}"
     fi
 
-    # --------------------------------------------------------------------------
-    # undo
-    # --------------------------------------------------------------------------
-    if [[ "${1:-}" == "--undo" ]]; then
-        say "Undo, restoring from ${BACKUP}"
-            [[ -d "${BACKUP}" ]] || die "no backup directory at ${BACKUP}. Nothing to restore."
-                [[ -f "${BACKUP}/policy.json.before" ]] || die "missing ${BACKUP}/policy.json.before"
-                    [[ -f "${BACKUP}/cosign.pub.before" ]] || die "missing ${BACKUP}/cosign.pub.before"
+    if [[ -f "${BACKUP}/uupd.timer.before" ]] && grep -qx active "${BACKUP}/uupd.timer.before"; then
+        systemctl start uupd.timer
+        ok "uupd.timer restarted"
+    fi
+    say "Restored. Current digests:"
+    sha256sum "${POLICY_PATH}" "${KEY_PATH}"
+    if [[ -f "${REGISTRIES_D_PATH}" ]]; then
+        sha256sum "${REGISTRIES_D_PATH}"
+    else
+        echo "(no ${REGISTRIES_D_PATH})"
+    fi
+    if ! diff -u "${BACKUP}/sha256.before.txt" <(sha256sum "${POLICY_PATH}" "${KEY_PATH}"); then
+        die "restored files do not match the recorded pre-repair digests. Inspect ${BACKUP} by hand."
+    fi
+    ok "byte-identical to pre-repair state"
+    exit 0
+fi
 
-                        cp -a "${BACKUP}/policy.json.before" "${POLICY_PATH}.sageos-undo"
-                            mv -T "${POLICY_PATH}.sageos-undo" "${POLICY_PATH}"
-                                cp -a "${BACKUP}/cosign.pub.before" "${KEY_PATH}.sageos-undo"
-                                    mv -T "${KEY_PATH}.sageos-undo" "${KEY_PATH}"
-                                        command -v restorecon >/dev/null 2>&1 && restorecon "${POLICY_PATH}" "${KEY_PATH}" || true
+# --------------------------------------------------------------------------
+# 1. preflight and backup
+# --------------------------------------------------------------------------
+say "Step 1: preflight and backup"
+if [[ -e "${BACKUP}" ]]; then
+    die "${BACKUP} already exists. Move it aside, or re-run with SAGEOS_REPAIR_BACKUP=/root/sageos-policy-repair-\$(date +%F)-v2 so this run keeps its own backup."
+fi
+umask 077
+mkdir -p "${BACKUP}"
 
-                                            # registries.d: restore prior file, or remove if we created it
-                                                if [[ -f "${BACKUP}/registries.d.created" ]]; then
-                                                        rm -f "${REGISTRIES_D_PATH}"
-                                                                ok "removed ${REGISTRIES_D_PATH} (was created by this repair)"
-                                                                    elif [[ -f "${BACKUP}/registries.d.before" ]]; then
-                                                                            cp -a "${BACKUP}/registries.d.before" "${REGISTRIES_D_PATH}.sageos-undo"
-                                                                                    mv -T "${REGISTRIES_D_PATH}.sageos-undo" "${REGISTRIES_D_PATH}"
-                                                                                            command -v restorecon >/dev/null 2>&1 && restorecon "${REGISTRIES_D_PATH}" || true
-                                                                                                    ok "restored ${REGISTRIES_D_PATH}"
-                                                                                                        fi
-                                                                                                        
-                                                                                                            if [[ -f "${BACKUP}/uupd.timer.before" ]] && grep -qx active "${BACKUP}/uupd.timer.before"; then
-                                                                                                                    systemctl start uupd.timer
-                                                                                                                            ok "uupd.timer restarted"
-                                                                                                                                fi
-                                                                                                                                    say "Restored. Current digests:"
-                                                                                                                                        sha256sum "${POLICY_PATH}" "${KEY_PATH}"
-                                                                                                                                            if [[ -f "${REGISTRIES_D_PATH}" ]]; then
-                                                                                                                                                    sha256sum "${REGISTRIES_D_PATH}"
-                                                                                                                                                        else
-                                                                                                                                                                echo "(no ${REGISTRIES_D_PATH})"
-                                                                                                                                                                    fi
-                                                                                                                                                                        if ! diff -u "${BACKUP}/sha256.before.txt" <(sha256sum "${POLICY_PATH}" "${KEY_PATH}"); then
-                                                                                                                                                                                die "restored files do not match the recorded pre-repair digests. Inspect ${BACKUP} by hand."
-                                                                                                                                                                                    fi
-                                                                                                                                                                                        ok "byte-identical to pre-repair state"
-                                                                                                                                                                                            exit 0
-                                                                                                                                                                                            fi
-                                                                                                                                                                                            
-                                                                                                                                                                                            # --------------------------------------------------------------------------
-                                                                                                                                                                                            # 1. preflight and backup
-                                                                                                                                                                                            # --------------------------------------------------------------------------
-                                                                                                                                                                                            say "Step 1: preflight and backup"
-                                                                                                                                                                                            if [[ -e "${BACKUP}" ]]; then
-                                                                                                                                                                                                die "${BACKUP} already exists. Move it aside, or re-run with SAGEOS_REPAIR_BACKUP=/root/sageos-policy-repair-\$(date +%F)-v2 so this run keeps its own backup."
-                                                                                                                                                                                                fi
-                                                                                                                                                                                                umask 077
-                                                                                                                                                                                                mkdir -p "${BACKUP}"
-                                                                                                                                                                                                
-                                                                                                                                                                                                for tool in jq python3 skopeo sha256sum; do
-                                                                                                                                                                                                    command -v "${tool}" >/dev/null 2>&1 || die "missing required tool: ${tool}"
-                                                                                                                                                                                                    done
-                                                                                                                                                                                                    ok "required tools present"
-                                                                                                                                                                                                    
-                                                                                                                                                                                                    [[ -f "${POLICY_PATH}" ]] || die "${POLICY_PATH} does not exist. This script repairs an existing policy, it does not create one from nothing."
-                                                                                                                                                                                                    [[ -f "${KEY_PATH}" ]] || die "${KEY_PATH} does not exist. The image should ship it; investigate before repairing."
-                                                                                                                                                                                                    if [[ -L "${POLICY_PATH}" ]]; then
-                                                                                                                                                                                                        die "${POLICY_PATH} is a symlink. Resolve that by hand first."
-                                                                                                                                                                                                        fi
-                                                                                                                                                                                                        if [[ -L "${KEY_PATH}" ]]; then
-                                                                                                                                                                                                            die "${KEY_PATH} is a symlink. Resolve that by hand first."
-                                                                                                                                                                                                            fi
-                                                                                                                                                                                                            if [[ -e "${REGISTRIES_D_PATH}" && -L "${REGISTRIES_D_PATH}" ]]; then
-                                                                                                                                                                                                                die "${REGISTRIES_D_PATH} is a symlink. Resolve that by hand first."
-                                                                                                                                                                                                                fi
-                                                                                                                                                                                                                ok "target files are regular files (or registries.d not yet present)"
-                                                                                                                                                                                                                
-                                                                                                                                                                                                                bootc status --format=json > "${BACKUP}/bootc-status.before.json" 2>/dev/null || true
-                                                                                                                                                                                                                jq -e '.status.booted != null' "${BACKUP}/bootc-status.before.json" >/dev/null 2>&1 \
-                                                                                                                                                                                                                    || printf '  \033[1;33mNOTE\033[0m  bootc reports no managed booted image (expected if packages are layered)\n'
-                                                                                                                                                                                                                    rpm-ostree status --booted > "${BACKUP}/rpm-ostree-status.before.txt" 2>/dev/null || true
-                                                                                                                                                                                                                    
-                                                                                                                                                                                                                    cp -a "${POLICY_PATH}" "${BACKUP}/policy.json.before"
-                                                                                                                                                                                                                    cp -a "${KEY_PATH}" "${BACKUP}/cosign.pub.before"
-                                                                                                                                                                                                                    sha256sum "${POLICY_PATH}" "${KEY_PATH}" > "${BACKUP}/sha256.before.txt"
-                                                                                                                                                                                                                    if [[ -f "${REGISTRIES_D_PATH}" ]]; then
-                                                                                                                                                                                                                        cp -a "${REGISTRIES_D_PATH}" "${BACKUP}/registries.d.before"
-                                                                                                                                                                                                                            sha256sum "${REGISTRIES_D_PATH}" >> "${BACKUP}/sha256.before.txt"
-                                                                                                                                                                                                                            else
-                                                                                                                                                                                                                                : > "${BACKUP}/registries.d.created"
-                                                                                                                                                                                                                                fi
-                                                                                                                                                                                                                                ok "backed up to ${BACKUP}"
-                                                                                                                                                                                                                                
-                                                                                                                                                                                                                                if systemctl is-active --quiet uupd.service; then
-                                                                                                                                                                                                                                    die "an update is running right now (uupd.service active). Wait for it to finish, then re-run."
-                                                                                                                                                                                                                                    fi
-                                                                                                                                                                                                                                    systemctl is-active uupd.timer > "${BACKUP}/uupd.timer.before" 2>/dev/null || true
-                                                                                                                                                                                                                                    if grep -qx active "${BACKUP}/uupd.timer.before" 2>/dev/null; then
-                                                                                                                                                                                                                                        systemctl stop uupd.timer
-                                                                                                                                                                                                                                            ok "uupd.timer stopped for the duration (runtime only, still enabled)"
-                                                                                                                                                                                                                                            fi
-                                                                                                                                                                                                                                            
-                                                                                                                                                                                                                                            # --------------------------------------------------------------------------
-                                                                                                                                                                                                                                            # 2. build and check candidates
-                                                                                                                                                                                                                                            # --------------------------------------------------------------------------
-                                                                                                                                                                                                                                            say "Step 2: build and check candidates"
-                                                                                                                                                                                                                                            cat > "${BACKUP}/cosign.pub.candidate" << 'EOF'
-                                                                                                                                                                                                                                            -----BEGIN PUBLIC KEY-----
-                                                                                                                                                                                                                                            MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE8ToaPxsA4SyPQ3iCYxsA2kzeUx1A
-                                                                                                                                                                                                                                            JTYiw0klG6roXjYPsPA87iJt/fmQAnr0AUULpj+CsSCW1wGOR2yPlJD9Rg==
-                                                                                                                                                                                                                                            -----END PUBLIC KEY-----
-                                                                                                                                                                                                                                            EOF
-                                                                                                                                                                                                                                            
-                                                                                                                                                                                                                                            cat > "${BACKUP}/policy.json.candidate" << 'EOF'
-                                                                                                                                                                                                                                            {
-                                                                                                                                                                                                                                              "default": [
-                                                                                                                                                                                                                                                  {
-                                                                                                                                                                                                                                                        "type": "insecureAcceptAnything"
-                                                                                                                                                                                                                                                            }
-                                                                                                                                                                                                                                                              ],
-                                                                                                                                                                                                                                                                "transports": {
-                                                                                                                                                                                                                                                                    "docker": {
-                                                                                                                                                                                                                                                                          "ghcr.io/sageajnz-create/sageos": [
-                                                                                                                                                                                                                                                                                  {
-                                                                                                                                                                                                                                                                                            "type": "sigstoreSigned",
-                                                                                                                                                                                                                                                                                                      "keyPath": "/etc/pki/containers/cosign.pub",
-                                                                                                                                                                                                                                                                                                                "signedIdentity": {
-                                                                                                                                                                                                                                                                                                                            "type": "matchRepository"
-                                                                                                                                                                                                                                                                                                                                      }
-                                                                                                                                                                                                                                                                                                                                              }
-                                                                                                                                                                                                                                                                                                                                                    ]
-                                                                                                                                                                                                                                                                                                                                                        }
-                                                                                                                                                                                                                                                                                                                                                          }
-                                                                                                                                                                                                                                                                                                                                                          }
-                                                                                                                                                                                                                                                                                                                                                          EOF
-                                                                                                                                                                                                                                                                                                                                                          
-                                                                                                                                                                                                                                                                                                                                                          cat > "${BACKUP}/registries.d.candidate" << 'EOF'
-                                                                                                                                                                                                                                                                                                                                                          # SageOS: enable cosign sigstore attachment lookup for our image only.
-                                                                                                                                                                                                                                                                                                                                                          # Without this, containers/image ignores sha256-<digest>.sig tags on GHCR
-                                                                                                                                                                                                                                                                                                                                                          # and reports "no signature exists" under a sigstoreSigned policy.
-                                                                                                                                                                                                                                                                                                                                                          docker:
-                                                                                                                                                                                                                                                                                                                                                            ghcr.io/sageajnz-create/sageos:
-                                                                                                                                                                                                                                                                                                                                                                use-sigstore-attachments: true
-                                                                                                                                                                                                                                                                                                                                                                EOF
-                                                                                                                                                                                                                                                                                                                                                                
-                                                                                                                                                                                                                                                                                                                                                                printf '%s  %s\n' "${KEY_SHA256}" "${BACKUP}/cosign.pub.candidate" | sha256sum --check --quiet \
-                                                                                                                                                                                                                                                                                                                                                                    || die "candidate key does not match the expected repository digest. Do not proceed."
-                                                                                                                                                                                                                                                                                                                                                                    ok "candidate key matches the repository digest"
-                                                                                                                                                                                                                                                                                                                                                                    
-                                                                                                                                                                                                                                                                                                                                                                    python3 - "${BACKUP}/policy.json.candidate" << 'PY' || die "candidate policy failed its semantic check"
-                                                                                                                                                                                                                                                                                                                                                                    import json, pathlib, sys
-                                                                                                                                                                                                                                                                                                                                                                    got = json.loads(pathlib.Path(sys.argv[1]).read_text())
-                                                                                                                                                                                                                                                                                                                                                                    want = {
-                                                                                                                                                                                                                                                                                                                                                                        "default": [{"type": "insecureAcceptAnything"}],
-                                                                                                                                                                                                                                                                                                                                                                            "transports": {"docker": {"ghcr.io/sageajnz-create/sageos": [{
-                                                                                                                                                                                                                                                                                                                                                                                    "type": "sigstoreSigned",
-                                                                                                                                                                                                                                                                                                                                                                                            "keyPath": "/etc/pki/containers/cosign.pub",
-                                                                                                                                                                                                                                                                                                                                                                                                    "signedIdentity": {"type": "matchRepository"},
-                                                                                                                                                                                                                                                                                                                                                                                                        }]}},
-                                                                                                                                                                                                                                                                                                                                                                                                        }
-                                                                                                                                                                                                                                                                                                                                                                                                        assert got == want, "candidate policy does not match the shipped policy"
-                                                                                                                                                                                                                                                                                                                                                                                                        PY
-                                                                                                                                                                                                                                                                                                                                                                                                        ok "candidate policy parses and matches the shipped policy"
-                                                                                                                                                                                                                                                                                                                                                                                                        
-                                                                                                                                                                                                                                                                                                                                                                                                        python3 - "${BACKUP}/registries.d.candidate" << 'PY' || die "candidate registries.d failed its semantic check"
-                                                                                                                                                                                                                                                                                                                                                                                                        import pathlib, sys
-                                                                                                                                                                                                                                                                                                                                                                                                        text = pathlib.Path(sys.argv[1]).read_text()
-                                                                                                                                                                                                                                                                                                                                                                                                        assert "ghcr.io/sageajnz-create/sageos:" in text
-                                                                                                                                                                                                                                                                                                                                                                                                        assert "use-sigstore-attachments: true" in text
-                                                                                                                                                                                                                                                                                                                                                                                                        assert "default-docker" not in text
-                                                                                                                                                                                                                                                                                                                                                                                                        # Must not enable whole ghcr.io
-                                                                                                                                                                                                                                                                                                                                                                                                        for line in text.splitlines():
-                                                                                                                                                                                                                                                                                                                                                                                                            stripped = line.split("#", 1)[0].rstrip()
-                                                                                                                                                                                                                                                                                                                                                                                                                if stripped == "ghcr.io:" or stripped.endswith(" ghcr.io:"):
-                                                                                                                                                                                                                                                                                                                                                                                                                        raise SystemExit("registries.d must not enable whole ghcr.io")
-                                                                                                                                                                                                                                                                                                                                                                                                                        PY
-                                                                                                                                                                                                                                                                                                                                                                                                                        ok "candidate registries.d is repo-scoped"
-                                                                                                                                                                                                                                                                                                                                                                                                                        
-                                                                                                                                                                                                                                                                                                                                                                                                                        # --------------------------------------------------------------------------
-                                                                                                                                                                                                                                                                                                                                                                                                                        # 3. atomic install: registries.d, then key, then policy
-                                                                                                                                                                                                                                                                                                                                                                                                                        # --------------------------------------------------------------------------
-                                                                                                                                                                                                                                                                                                                                                                                                                        say "Step 3: install (registries.d, then key, then policy)"
-                                                                                                                                                                                                                                                                                                                                                                                                                        mkdir -p "${REGISTRIES_D_DIR}"
-                                                                                                                                                                                                                                                                                                                                                                                                                        install -o root -g root -m 0644 "${BACKUP}/registries.d.candidate" "${REGISTRIES_D_PATH}.sageos-repair"
-                                                                                                                                                                                                                                                                                                                                                                                                                        command -v restorecon >/dev/null 2>&1 && restorecon "${REGISTRIES_D_PATH}.sageos-repair" || true
-                                                                                                                                                                                                                                                                                                                                                                                                                        mv -T "${REGISTRIES_D_PATH}.sageos-repair" "${REGISTRIES_D_PATH}"
-                                                                                                                                                                                                                                                                                                                                                                                                                        
-                                                                                                                                                                                                                                                                                                                                                                                                                        install -o root -g root -m 0644 "${BACKUP}/cosign.pub.candidate" "${KEY_PATH}.sageos-repair"
-                                                                                                                                                                                                                                                                                                                                                                                                                        command -v restorecon >/dev/null 2>&1 && restorecon "${KEY_PATH}.sageos-repair" || true
-                                                                                                                                                                                                                                                                                                                                                                                                                        mv -T "${KEY_PATH}.sageos-repair" "${KEY_PATH}"
-                                                                                                                                                                                                                                                                                                                                                                                                                        
-                                                                                                                                                                                                                                                                                                                                                                                                                        install -o root -g root -m 0644 "${BACKUP}/policy.json.candidate" "${POLICY_PATH}.sageos-repair"
-                                                                                                                                                                                                                                                                                                                                                                                                                        command -v restorecon >/dev/null 2>&1 && restorecon "${POLICY_PATH}.sageos-repair" || true
-                                                                                                                                                                                                                                                                                                                                                                                                                        mv -T "${POLICY_PATH}.sageos-repair" "${POLICY_PATH}"
-                                                                                                                                                                                                                                                                                                                                                                                                                        
-                                                                                                                                                                                                                                                                                                                                                                                                                        command -v restorecon >/dev/null 2>&1 && restorecon "${KEY_PATH}" "${POLICY_PATH}" "${REGISTRIES_D_PATH}" || true
-                                                                                                                                                                                                                                                                                                                                                                                                                        ok "installed"
-                                                                                                                                                                                                                                                                                                                                                                                                                        
-                                                                                                                                                                                                                                                                                                                                                                                                                        # --------------------------------------------------------------------------
-                                                                                                                                                                                                                                                                                                                                                                                                                        # 4. validate what is actually live
-                                                                                                                                                                                                                                                                                                                                                                                                                        # --------------------------------------------------------------------------
-                                                                                                                                                                                                                                                                                                                                                                                                                        say "Step 4: validate live policy, key, and registries.d"
-                                                                                                                                                                                                                                                                                                                                                                                                                        python3 - << 'PY' || die "live policy/key validation failed. Run with --undo."
-                                                                                                                                                                                                                                                                                                                                                                                                                        import hashlib, json, pathlib
-                                                                                                                                                                                                                                                                                                                                                                                                                        policy = json.loads(pathlib.Path('/etc/containers/policy.json').read_text())
-                                                                                                                                                                                                                                                                                                                                                                                                                        want = [{
-                                                                                                                                                                                                                                                                                                                                                                                                                            "type": "sigstoreSigned",
-                                                                                                                                                                                                                                                                                                                                                                                                                                "keyPath": "/etc/pki/containers/cosign.pub",
-                                                                                                                                                                                                                                                                                                                                                                                                                                    "signedIdentity": {"type": "matchRepository"},
-                                                                                                                                                                                                                                                                                                                                                                                                                                    }]
-                                                                                                                                                                                                                                                                                                                                                                                                                                    assert policy['transports']['docker']['ghcr.io/sageajnz-create/sageos'] == want, "live policy scope is wrong"
-                                                                                                                                                                                                                                                                                                                                                                                                                                    digest = hashlib.sha256(pathlib.Path('/etc/pki/containers/cosign.pub').read_bytes()).hexdigest()
-                                                                                                                                                                                                                                                                                                                                                                                                                                    assert digest == '293b458eb7a2dda8f80c5e27bc81e73ef4018c0591abb114e5dde6816e149914', "live key is not the SageOS key"
-                                                                                                                                                                                                                                                                                                                                                                                                                                    reg = pathlib.Path('/etc/containers/registries.d/ghcr.io-sageajnz-create-sageos.yaml').read_text()
-                                                                                                                                                                                                                                                                                                                                                                                                                                    assert 'ghcr.io/sageajnz-create/sageos:' in reg and 'use-sigstore-attachments: true' in reg
-                                                                                                                                                                                                                                                                                                                                                                                                                                    PY
-                                                                                                                                                                                                                                                                                                                                                                                                                                    cmp "${BACKUP}/cosign.pub.candidate" "${KEY_PATH}"
-                                                                                                                                                                                                                                                                                                                                                                                                                                    cmp "${BACKUP}/registries.d.candidate" "${REGISTRIES_D_PATH}"
-                                                                                                                                                                                                                                                                                                                                                                                                                                    ok "live policy scope, exact key, and registries.d confirmed"
-                                                                                                                                                                                                                                                                                                                                                                                                                                    
-                                                                                                                                                                                                                                                                                                                                                                                                                                    # --------------------------------------------------------------------------
-                                                                                                                                                                                                                                                                                                                                                                                                                                    # 5. prove enforcement without touching the deployment
-                                                                                                                                                                                                                                                                                                                                                                                                                                    # --------------------------------------------------------------------------
-                                                                                                                                                                                                                                                                                                                                                                                                                                    say "Step 5: prove a signed pull is accepted under the live policy + registries.d"
-                                                                                                                                                                                                                                                                                                                                                                                                                                    echo "  (downloads into an isolated /var/tmp dir; does not touch the deployment or podman storage)"
-                                                                                                                                                                                                                                                                                                                                                                                                                                    DIGEST="$(skopeo inspect "docker://${IMAGE_REPO}:latest" | jq -er '.Digest | select(test("^sha256:[0-9a-f]{64}$"))')" \
-                                                                                                                                                                                                                                                                                                                                                                                                                                        || die "could not resolve the published digest. Check network, then re-run or --undo."
-                                                                                                                                                                                                                                                                                                                                                                                                                                        SOURCE="docker://${IMAGE_REPO}@${DIGEST}"
-                                                                                                                                                                                                                                                                                                                                                                                                                                        echo "  testing ${SOURCE}"
-                                                                                                                                                                                                                                                                                                                                                                                                                                        SCRATCH="$(mktemp -d /var/tmp/sageos-signed-pull.XXXXXX)"
-                                                                                                                                                                                                                                                                                                                                                                                                                                        trap 'rm -rf "${SCRATCH}"' EXIT
-                                                                                                                                                                                                                                                                                                                                                                                                                                        if ! skopeo --policy "${POLICY_PATH}" copy "${SOURCE}" "dir:${SCRATCH}/image" >/dev/null; then
-                                                                                                                                                                                                                                                                                                                                                                                                                                            die "the policy-enforced signed pull FAILED. The new policy would block your updates. Re-run with --undo now."
-                                                                                                                                                                                                                                                                                                                                                                                                                                            fi
-                                                                                                                                                                                                                                                                                                                                                                                                                                            ok "containers/image accepted the signed digest under the live policy"
-                                                                                                                                                                                                                                                                                                                                                                                                                                            
-                                                                                                                                                                                                                                                                                                                                                                                                                                            # --------------------------------------------------------------------------
-                                                                                                                                                                                                                                                                                                                                                                                                                                            # 6. doctor
-                                                                                                                                                                                                                                                                                                                                                                                                                                            # --------------------------------------------------------------------------
-                                                                                                                                                                                                                                                                                                                                                                                                                                            say "Step 6: sageos-doctor"
-                                                                                                                                                                                                                                                                                                                                                                                                                                            DOCTOR_JSON="${BACKUP}/doctor.after.json"
-                                                                                                                                                                                                                                                                                                                                                                                                                                            /usr/libexec/sageos-doctor --json > "${DOCTOR_JSON}" 2>/dev/null || true
-                                                                                                                                                                                                                                                                                                                                                                                                                                            if jq -e --arg m "image signature enforced for ${IMAGE_REPO}" \
-                                                                                                                                                                                                                                                                                                                                                                                                                                                '.checks[] | select(.section == "Updates & integrity" and .status == "pass" and .message == $m)' \
-                                                                                                                                                                                                                                                                                                                                                                                                                                                    "${DOCTOR_JSON}" >/dev/null 2>&1; then
-                                                                                                                                                                                                                                                                                                                                                                                                                                                        ok "doctor now reports: image signature enforced for ${IMAGE_REPO}"
-                                                                                                                                                                                                                                                                                                                                                                                                                                                        else
-                                                                                                                                                                                                                                                                                                                                                                                                                                                            printf '  \033[1;33mNOTE\033[0m  could not confirm the doctor signature check from JSON. Raw signature-related checks:\n'
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                jq '.checks[] | select(.message | test("signature"; "i"))' "${DOCTOR_JSON}" 2>/dev/null || cat "${DOCTOR_JSON}"
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                fi
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                if grep -qx active "${BACKUP}/uupd.timer.before" 2>/dev/null; then
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                    systemctl start uupd.timer
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ok "uupd.timer restarted"
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                        fi
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                        say "Done"
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                        cat << EOF
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                          Backup and evidence: ${BACKUP}
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                            Undo any time:       sudo SAGEOS_REPAIR_BACKUP=${BACKUP} $0 --undo
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                              Notes
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 - The already-booted deployment is NOT retrospectively authenticated. This
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      protects future pulls of ${IMAGE_REPO}.
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         - registries.d enables cosign .sig attachment lookup for this repo only.
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            - "default" stays insecureAcceptAnything, so this does not yet satisfy
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 bootc's --enforce-container-sigpolicy reject-default guard. That belongs
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      in the image-side fix, not in a local repair.
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         - Negative tests (unsigned and tampered images must all be REJECTED)
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              belong on a clean unlayered QCOW2/VM, not on this machine.
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              EOF
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
+for tool in jq python3 skopeo sha256sum; do
+    command -v "${tool}" >/dev/null 2>&1 || die "missing required tool: ${tool}"
+done
+ok "required tools present"
+
+[[ -f "${POLICY_PATH}" ]] || die "${POLICY_PATH} does not exist. This script repairs an existing policy, it does not create one from nothing."
+[[ -f "${KEY_PATH}" ]] || die "${KEY_PATH} does not exist. The image should ship it; investigate before repairing."
+if [[ -L "${POLICY_PATH}" ]]; then
+    die "${POLICY_PATH} is a symlink. Resolve that by hand first."
+fi
+if [[ -L "${KEY_PATH}" ]]; then
+    die "${KEY_PATH} is a symlink. Resolve that by hand first."
+fi
+if [[ -e "${REGISTRIES_D_PATH}" && -L "${REGISTRIES_D_PATH}" ]]; then
+    die "${REGISTRIES_D_PATH} is a symlink. Resolve that by hand first."
+fi
+ok "target files are regular files (or registries.d not yet present)"
+
+bootc status --format=json > "${BACKUP}/bootc-status.before.json" 2>/dev/null || true
+jq -e '.status.booted != null' "${BACKUP}/bootc-status.before.json" >/dev/null 2>&1 \
+    || printf '  \033[1;33mNOTE\033[0m  bootc reports no managed booted image (expected if packages are layered)\n'
+rpm-ostree status --booted > "${BACKUP}/rpm-ostree-status.before.txt" 2>/dev/null || true
+
+cp -a "${POLICY_PATH}" "${BACKUP}/policy.json.before"
+cp -a "${KEY_PATH}" "${BACKUP}/cosign.pub.before"
+# Strict undo digest check covers policy + key only. registries.d is tracked
+# separately so a pre-existing lookaside file cannot false-fail --undo.
+sha256sum "${POLICY_PATH}" "${KEY_PATH}" > "${BACKUP}/sha256.before.txt"
+if [[ -f "${REGISTRIES_D_PATH}" ]]; then
+    cp -a "${REGISTRIES_D_PATH}" "${BACKUP}/registries.d.before"
+    sha256sum "${REGISTRIES_D_PATH}" > "${BACKUP}/sha256.registries.before.txt"
+else
+    : > "${BACKUP}/registries.d.created"
+fi
+ok "backed up to ${BACKUP}"
+
+if systemctl is-active --quiet uupd.service; then
+    die "an update is running right now (uupd.service active). Wait for it to finish, then re-run."
+fi
+systemctl is-active uupd.timer > "${BACKUP}/uupd.timer.before" 2>/dev/null || true
+if grep -qx active "${BACKUP}/uupd.timer.before" 2>/dev/null; then
+    systemctl stop uupd.timer
+    ok "uupd.timer stopped for the duration (runtime only, still enabled)"
+fi
+
+# --------------------------------------------------------------------------
+# 2. build and check candidates
+# --------------------------------------------------------------------------
+say "Step 2: build and check candidates"
+cat > "${BACKUP}/cosign.pub.candidate" << 'EOF'
+-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE8ToaPxsA4SyPQ3iCYxsA2kzeUx1A
+JTYiw0klG6roXjYPsPA87iJt/fmQAnr0AUULpj+CsSCW1wGOR2yPlJD9Rg==
+-----END PUBLIC KEY-----
+EOF
+
+cat > "${BACKUP}/policy.json.candidate" << 'EOF'
+{
+  "default": [
+    {
+      "type": "insecureAcceptAnything"
+    }
+  ],
+  "transports": {
+    "docker": {
+      "ghcr.io/sageajnz-create/sageos": [
+        {
+          "type": "sigstoreSigned",
+          "keyPath": "/etc/pki/containers/cosign.pub",
+          "signedIdentity": {
+            "type": "matchRepository"
+          }
+        }
+      ]
+    }
+  }
+}
+EOF
+
+cat > "${BACKUP}/registries.d.candidate" << 'EOF'
+# SageOS: enable cosign sigstore attachment lookup for our image only.
+# Without this, containers/image ignores sha256-<digest>.sig tags on GHCR
+# and reports "no signature exists" under a sigstoreSigned policy.
+docker:
+  ghcr.io/sageajnz-create/sageos:
+    use-sigstore-attachments: true
+EOF
+
+printf '%s  %s\n' "${KEY_SHA256}" "${BACKUP}/cosign.pub.candidate" | sha256sum --check --quiet \
+    || die "candidate key does not match the expected repository digest. Do not proceed."
+ok "candidate key matches the repository digest"
+
+python3 - "${BACKUP}/policy.json.candidate" << 'PY' || die "candidate policy failed its semantic check"
+import json, pathlib, sys
+got = json.loads(pathlib.Path(sys.argv[1]).read_text())
+want = {
+    "default": [{"type": "insecureAcceptAnything"}],
+    "transports": {"docker": {"ghcr.io/sageajnz-create/sageos": [{
+        "type": "sigstoreSigned",
+        "keyPath": "/etc/pki/containers/cosign.pub",
+        "signedIdentity": {"type": "matchRepository"},
+    }]}},
+}
+assert got == want, "candidate policy does not match the shipped policy"
+PY
+ok "candidate policy parses and matches the shipped policy"
+
+python3 - "${BACKUP}/registries.d.candidate" << 'PY' || die "candidate registries.d failed its semantic check"
+import pathlib, sys
+text = pathlib.Path(sys.argv[1]).read_text()
+assert "ghcr.io/sageajnz-create/sageos:" in text
+assert "use-sigstore-attachments: true" in text
+assert "default-docker" not in text
+# Must not enable whole ghcr.io
+for line in text.splitlines():
+    stripped = line.split("#", 1)[0].rstrip()
+    if stripped == "ghcr.io:" or stripped.endswith(" ghcr.io:"):
+        raise SystemExit("registries.d must not enable whole ghcr.io")
+PY
+ok "candidate registries.d is repo-scoped"
+
+# --------------------------------------------------------------------------
+# 3. atomic install: registries.d, then key, then policy
+# --------------------------------------------------------------------------
+say "Step 3: install (registries.d, then key, then policy)"
+mkdir -p "${REGISTRIES_D_DIR}"
+install -o root -g root -m 0644 "${BACKUP}/registries.d.candidate" "${REGISTRIES_D_PATH}.sageos-repair"
+command -v restorecon >/dev/null 2>&1 && restorecon "${REGISTRIES_D_PATH}.sageos-repair" || true
+mv -T "${REGISTRIES_D_PATH}.sageos-repair" "${REGISTRIES_D_PATH}"
+
+install -o root -g root -m 0644 "${BACKUP}/cosign.pub.candidate" "${KEY_PATH}.sageos-repair"
+command -v restorecon >/dev/null 2>&1 && restorecon "${KEY_PATH}.sageos-repair" || true
+mv -T "${KEY_PATH}.sageos-repair" "${KEY_PATH}"
+
+install -o root -g root -m 0644 "${BACKUP}/policy.json.candidate" "${POLICY_PATH}.sageos-repair"
+command -v restorecon >/dev/null 2>&1 && restorecon "${POLICY_PATH}.sageos-repair" || true
+mv -T "${POLICY_PATH}.sageos-repair" "${POLICY_PATH}"
+
+command -v restorecon >/dev/null 2>&1 && restorecon "${KEY_PATH}" "${POLICY_PATH}" "${REGISTRIES_D_PATH}" || true
+ok "installed"
+
+# --------------------------------------------------------------------------
+# 4. validate what is actually live
+# --------------------------------------------------------------------------
+say "Step 4: validate live policy, key, and registries.d"
+python3 - << 'PY' || die "live policy/key validation failed. Run with --undo."
+import hashlib, json, pathlib
+policy = json.loads(pathlib.Path('/etc/containers/policy.json').read_text())
+want = [{
+    "type": "sigstoreSigned",
+    "keyPath": "/etc/pki/containers/cosign.pub",
+    "signedIdentity": {"type": "matchRepository"},
+}]
+assert policy['transports']['docker']['ghcr.io/sageajnz-create/sageos'] == want, "live policy scope is wrong"
+digest = hashlib.sha256(pathlib.Path('/etc/pki/containers/cosign.pub').read_bytes()).hexdigest()
+assert digest == '293b458eb7a2dda8f80c5e27bc81e73ef4018c0591abb114e5dde6816e149914', "live key is not the SageOS key"
+reg = pathlib.Path('/etc/containers/registries.d/ghcr.io-sageajnz-create-sageos.yaml').read_text()
+assert 'ghcr.io/sageajnz-create/sageos:' in reg and 'use-sigstore-attachments: true' in reg
+PY
+cmp "${BACKUP}/cosign.pub.candidate" "${KEY_PATH}"
+cmp "${BACKUP}/registries.d.candidate" "${REGISTRIES_D_PATH}"
+ok "live policy scope, exact key, and registries.d confirmed"
+
+# --------------------------------------------------------------------------
+# 5. prove enforcement without touching the deployment
+# --------------------------------------------------------------------------
+say "Step 5: prove a signed pull is accepted under the live policy + registries.d"
+echo "  (downloads into an isolated /var/tmp dir; does not touch the deployment or podman storage)"
+DIGEST="$(skopeo inspect "docker://${IMAGE_REPO}:latest" | jq -er '.Digest | select(test("^sha256:[0-9a-f]{64}$"))')" \
+    || die "could not resolve the published digest. Check network, then re-run or --undo."
+SOURCE="docker://${IMAGE_REPO}@${DIGEST}"
+echo "  testing ${SOURCE}"
+SCRATCH="$(mktemp -d /var/tmp/sageos-signed-pull.XXXXXX)"
+trap 'rm -rf "${SCRATCH}"' EXIT
+if ! skopeo --policy "${POLICY_PATH}" copy "${SOURCE}" "dir:${SCRATCH}/image" >/dev/null; then
+    die "the policy-enforced signed pull FAILED. The new policy would block your updates. Re-run with --undo now."
+fi
+ok "containers/image accepted the signed digest under the live policy"
+
+# --------------------------------------------------------------------------
+# 6. doctor
+# --------------------------------------------------------------------------
+say "Step 6: sageos-doctor"
+DOCTOR_JSON="${BACKUP}/doctor.after.json"
+/usr/libexec/sageos-doctor --json > "${DOCTOR_JSON}" 2>/dev/null || true
+if jq -e --arg m "image signature enforced for ${IMAGE_REPO}" \
+    '.checks[] | select(.section == "Updates & integrity" and .status == "pass" and .message == $m)' \
+    "${DOCTOR_JSON}" >/dev/null 2>&1; then
+    ok "doctor now reports: image signature enforced for ${IMAGE_REPO}"
+else
+    printf '  \033[1;33mNOTE\033[0m  could not confirm the doctor signature check from JSON. Raw signature-related checks:\n'
+    jq '.checks[] | select(.message | test("signature"; "i"))' "${DOCTOR_JSON}" 2>/dev/null || cat "${DOCTOR_JSON}"
+fi
+
+if grep -qx active "${BACKUP}/uupd.timer.before" 2>/dev/null; then
+    systemctl start uupd.timer
+    ok "uupd.timer restarted"
+fi
+
+say "Done"
+cat << EOF
+
+  Backup and evidence: ${BACKUP}
+  Undo any time:       sudo SAGEOS_REPAIR_BACKUP=${BACKUP} $0 --undo
+
+  Notes
+   - The already-booted deployment is NOT retrospectively authenticated. This
+     protects future pulls of ${IMAGE_REPO}.
+   - registries.d enables cosign .sig attachment lookup for this repo only.
+   - "default" stays insecureAcceptAnything, so this does not yet satisfy
+     bootc's --enforce-container-sigpolicy reject-default guard. That belongs
+     in the image-side fix, not in a local repair.
+   - Negative tests (unsigned and tampered images must all be REJECTED)
+     belong on a clean unlayered QCOW2/VM, not on this machine.
+EOF
