@@ -38,13 +38,31 @@ for unit in podman.socket sageos-flatpak-setup.service sageos-pin.service; do
     systemctl is-enabled "${unit}" >/dev/null || fail "unit not enabled: ${unit}"
 done
 
+# Signing trio must be live under /etc (not only in the build context overlay).
+[[ -f /etc/containers/policy.json ]] || fail "missing /etc/containers/policy.json"
+[[ -f /etc/pki/containers/cosign.pub ]] || fail "missing /etc/pki/containers/cosign.pub"
+[[ -f /etc/containers/registries.d/ghcr.io-sageajnz-create-sageos.yaml ]] \
+    || fail "missing /etc/containers/registries.d/ghcr.io-sageajnz-create-sageos.yaml"
+grep -Fq 'ghcr.io/sageajnz-create/sageos:' \
+    /etc/containers/registries.d/ghcr.io-sageajnz-create-sageos.yaml \
+    || fail "registries.d is not scoped to the SageOS repository"
+grep -Fq 'use-sigstore-attachments: true' \
+    /etc/containers/registries.d/ghcr.io-sageajnz-create-sageos.yaml \
+    || fail "registries.d does not enable sigstore attachments"
+key_sha256="$(sha256sum /etc/pki/containers/cosign.pub | awk '{print $1}')"
+[[ "${key_sha256}" == "293b458eb7a2dda8f80c5e27bc81e73ef4018c0591abb114e5dde6816e149914" ]] \
+    || fail "assembled cosign.pub sha256 is ${key_sha256}, expected SageOS key"
 python3 - <<'PYEOF'
 import json
 from pathlib import Path
 
 policy = json.loads(Path("/etc/containers/policy.json").read_text())
 rules = policy["transports"]["docker"]["ghcr.io/sageajnz-create/sageos"]
-if not any(rule.get("type") == "sigstoreSigned" for rule in rules):
+expected_key = "/etc/pki/containers/cosign.pub"
+if not any(
+    rule.get("type") == "sigstoreSigned" and rule.get("keyPath") == expected_key
+    for rule in rules
+):
     raise SystemExit("FAIL: assembled image does not enforce SageOS signatures")
 PYEOF
 
@@ -54,5 +72,5 @@ grep -Fq 'PRETTY_NAME="SageOS 0.1 (built on Bazzite)"' /usr/lib/os-release \
     || fail "SageOS branding missing from assembled image"
 grep -Fq 'NAME=SageOS' /etc/sageos-release || fail "SageOS release identity missing"
 
-echo "assembled image PASS: packages, modes, services, signing, ujust, and identity"
+echo "assembled image PASS: packages, modes, services, signing trio, ujust, and identity"
 IMAGE_TEST
