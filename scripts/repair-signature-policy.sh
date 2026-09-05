@@ -12,11 +12,18 @@
 #
 #   FAIL  signature policy does not require sigstore (/etc/containers/policy.json)
 #
+# Separately, cosign stores signatures as OCI tag attachments
+# (sha256-<digest>.sig). containers/image only looks for those when
+# registries.d sets use-sigstore-attachments for the repo. Without that file,
+# skopeo --policy reports "no signature exists" even when the .sig tag is on
+# GHCR. This script installs both the policy and the lookaside.
+#
 # What this touches
 # -----------------
-# Writes ONLY these two files:
+# Writes ONLY these three paths:
 #   /etc/pki/containers/cosign.pub
 #   /etc/containers/policy.json
+#   /etc/containers/registries.d/ghcr.io-sageajnz-create-sageos.yaml
 # No reboot. No rebase, switch, or upgrade. No deployment is staged.
 # It does NOT retrospectively authenticate the already-booted deployment.
 #
@@ -24,12 +31,18 @@
 #   sudo ./repair-signature-policy.sh          # preflight, back up, repair, verify
 #   sudo ./repair-signature-policy.sh --undo    # restore from this run's backup
 #
+# If a previous same-day backup directory already exists (e.g. after a prior
+# run + --undo), point at a fresh dir:
+#   sudo SAGEOS_REPAIR_BACKUP=/root/sageos-policy-repair-$(date +%F)-v2 ./repair-signature-policy.sh
+#
 # Every stage fails closed. If preflight stops, nothing has been changed.
 
 set -euo pipefail
 
 KEY_PATH="/etc/pki/containers/cosign.pub"
 POLICY_PATH="/etc/containers/policy.json"
+REGISTRIES_D_DIR="/etc/containers/registries.d"
+REGISTRIES_D_PATH="${REGISTRIES_D_DIR}/ghcr.io-sageajnz-create-sageos.yaml"
 IMAGE_REPO="ghcr.io/sageajnz-create/sageos"
 # sha256 of system_files/etc/pki/containers/cosign.pub on main, verified
 # against the repository before this script was written.
@@ -41,7 +54,7 @@ say() { printf '\033[1m==\033[0m %s\n' "$*"; }
 ok()  { printf '  \033[1;32mPASS\033[0m  %s\n' "$*"; }
 
 if [[ "${EUID}" -ne 0 ]]; then
-    die "run with sudo. This writes ${POLICY_PATH} and ${KEY_PATH}."
+    die "run with sudo. This writes ${POLICY_PATH}, ${KEY_PATH}, and ${REGISTRIES_D_PATH}."
 fi
 
 # --------------------------------------------------------------------------
@@ -59,12 +72,28 @@ if [[ "${1:-}" == "--undo" ]]; then
     mv -T "${KEY_PATH}.sageos-undo" "${KEY_PATH}"
     command -v restorecon >/dev/null 2>&1 && restorecon "${POLICY_PATH}" "${KEY_PATH}" || true
 
+    # registries.d: restore prior file, or remove if we created it
+    if [[ -f "${BACKUP}/registries.d.created" ]]; then
+        rm -f "${REGISTRIES_D_PATH}"
+        ok "removed ${REGISTRIES_D_PATH} (was created by this repair)"
+    elif [[ -f "${BACKUP}/registries.d.before" ]]; then
+        cp -a "${BACKUP}/registries.d.before" "${REGISTRIES_D_PATH}.sageos-undo"
+        mv -T "${REGISTRIES_D_PATH}.sageos-undo" "${REGISTRIES_D_PATH}"
+        command -v restorecon >/dev/null 2>&1 && restorecon "${REGISTRIES_D_PATH}" || true
+        ok "restored ${REGISTRIES_D_PATH}"
+    fi
+
     if [[ -f "${BACKUP}/uupd.timer.before" ]] && grep -qx active "${BACKUP}/uupd.timer.before"; then
         systemctl start uupd.timer
         ok "uupd.timer restarted"
     fi
     say "Restored. Current digests:"
     sha256sum "${POLICY_PATH}" "${KEY_PATH}"
+    if [[ -f "${REGISTRIES_D_PATH}" ]]; then
+        sha256sum "${REGISTRIES_D_PATH}"
+    else
+        echo "(no ${REGISTRIES_D_PATH})"
+    fi
     if ! diff -u "${BACKUP}/sha256.before.txt" <(sha256sum "${POLICY_PATH}" "${KEY_PATH}"); then
         die "restored files do not match the recorded pre-repair digests. Inspect ${BACKUP} by hand."
     fi
@@ -77,7 +106,7 @@ fi
 # --------------------------------------------------------------------------
 say "Step 1: preflight and backup"
 if [[ -e "${BACKUP}" ]]; then
-    die "${BACKUP} already exists. Move it aside so this run keeps its own backup."
+    die "${BACKUP} already exists. Move it aside, or re-run with SAGEOS_REPAIR_BACKUP=/root/sageos-policy-repair-\$(date +%F)-v2 so this run keeps its own backup."
 fi
 umask 077
 mkdir -p "${BACKUP}"
@@ -95,7 +124,10 @@ fi
 if [[ -L "${KEY_PATH}" ]]; then
     die "${KEY_PATH} is a symlink. Resolve that by hand first."
 fi
-ok "target files are regular files"
+if [[ -e "${REGISTRIES_D_PATH}" && -L "${REGISTRIES_D_PATH}" ]]; then
+    die "${REGISTRIES_D_PATH} is a symlink. Resolve that by hand first."
+fi
+ok "target files are regular files (or registries.d not yet present)"
 
 bootc status --format=json > "${BACKUP}/bootc-status.before.json" 2>/dev/null || true
 jq -e '.status.booted != null' "${BACKUP}/bootc-status.before.json" >/dev/null 2>&1 \
@@ -104,7 +136,15 @@ rpm-ostree status --booted > "${BACKUP}/rpm-ostree-status.before.txt" 2>/dev/nul
 
 cp -a "${POLICY_PATH}" "${BACKUP}/policy.json.before"
 cp -a "${KEY_PATH}" "${BACKUP}/cosign.pub.before"
+# Strict undo digest check covers policy + key only. registries.d is tracked
+# separately so a pre-existing lookaside file cannot false-fail --undo.
 sha256sum "${POLICY_PATH}" "${KEY_PATH}" > "${BACKUP}/sha256.before.txt"
+if [[ -f "${REGISTRIES_D_PATH}" ]]; then
+    cp -a "${REGISTRIES_D_PATH}" "${BACKUP}/registries.d.before"
+    sha256sum "${REGISTRIES_D_PATH}" > "${BACKUP}/sha256.registries.before.txt"
+else
+    : > "${BACKUP}/registries.d.created"
+fi
 ok "backed up to ${BACKUP}"
 
 if systemctl is-active --quiet uupd.service; then
@@ -117,7 +157,7 @@ if grep -qx active "${BACKUP}/uupd.timer.before" 2>/dev/null; then
 fi
 
 # --------------------------------------------------------------------------
-# 2. build pinned candidates
+# 2. build and check candidates
 # --------------------------------------------------------------------------
 say "Step 2: build and check candidates"
 cat > "${BACKUP}/cosign.pub.candidate" << 'EOF'
@@ -150,6 +190,15 @@ cat > "${BACKUP}/policy.json.candidate" << 'EOF'
 }
 EOF
 
+cat > "${BACKUP}/registries.d.candidate" << 'EOF'
+# SageOS: enable cosign sigstore attachment lookup for our image only.
+# Without this, containers/image ignores sha256-<digest>.sig tags on GHCR
+# and reports "no signature exists" under a sigstoreSigned policy.
+docker:
+  ghcr.io/sageajnz-create/sageos:
+    use-sigstore-attachments: true
+EOF
+
 printf '%s  %s\n' "${KEY_SHA256}" "${BACKUP}/cosign.pub.candidate" | sha256sum --check --quiet \
     || die "candidate key does not match the expected repository digest. Do not proceed."
 ok "candidate key matches the repository digest"
@@ -169,10 +218,29 @@ assert got == want, "candidate policy does not match the shipped policy"
 PY
 ok "candidate policy parses and matches the shipped policy"
 
+python3 - "${BACKUP}/registries.d.candidate" << 'PY' || die "candidate registries.d failed its semantic check"
+import pathlib, sys
+text = pathlib.Path(sys.argv[1]).read_text()
+assert "ghcr.io/sageajnz-create/sageos:" in text
+assert "use-sigstore-attachments: true" in text
+assert "default-docker" not in text
+# Must not enable whole ghcr.io
+for line in text.splitlines():
+    stripped = line.split("#", 1)[0].rstrip()
+    if stripped == "ghcr.io:" or stripped.endswith(" ghcr.io:"):
+        raise SystemExit("registries.d must not enable whole ghcr.io")
+PY
+ok "candidate registries.d is repo-scoped"
+
 # --------------------------------------------------------------------------
-# 3. atomic install, key before policy
+# 3. atomic install: registries.d, then key, then policy
 # --------------------------------------------------------------------------
-say "Step 3: install (key first, so the policy never references a missing key)"
+say "Step 3: install (registries.d, then key, then policy)"
+mkdir -p "${REGISTRIES_D_DIR}"
+install -o root -g root -m 0644 "${BACKUP}/registries.d.candidate" "${REGISTRIES_D_PATH}.sageos-repair"
+command -v restorecon >/dev/null 2>&1 && restorecon "${REGISTRIES_D_PATH}.sageos-repair" || true
+mv -T "${REGISTRIES_D_PATH}.sageos-repair" "${REGISTRIES_D_PATH}"
+
 install -o root -g root -m 0644 "${BACKUP}/cosign.pub.candidate" "${KEY_PATH}.sageos-repair"
 command -v restorecon >/dev/null 2>&1 && restorecon "${KEY_PATH}.sageos-repair" || true
 mv -T "${KEY_PATH}.sageos-repair" "${KEY_PATH}"
@@ -181,13 +249,13 @@ install -o root -g root -m 0644 "${BACKUP}/policy.json.candidate" "${POLICY_PATH
 command -v restorecon >/dev/null 2>&1 && restorecon "${POLICY_PATH}.sageos-repair" || true
 mv -T "${POLICY_PATH}.sageos-repair" "${POLICY_PATH}"
 
-command -v restorecon >/dev/null 2>&1 && restorecon "${KEY_PATH}" "${POLICY_PATH}" || true
+command -v restorecon >/dev/null 2>&1 && restorecon "${KEY_PATH}" "${POLICY_PATH}" "${REGISTRIES_D_PATH}" || true
 ok "installed"
 
 # --------------------------------------------------------------------------
 # 4. validate what is actually live
 # --------------------------------------------------------------------------
-say "Step 4: validate live policy and exact key"
+say "Step 4: validate live policy, key, and registries.d"
 python3 - << 'PY' || die "live policy/key validation failed. Run with --undo."
 import hashlib, json, pathlib
 policy = json.loads(pathlib.Path('/etc/containers/policy.json').read_text())
@@ -199,14 +267,17 @@ want = [{
 assert policy['transports']['docker']['ghcr.io/sageajnz-create/sageos'] == want, "live policy scope is wrong"
 digest = hashlib.sha256(pathlib.Path('/etc/pki/containers/cosign.pub').read_bytes()).hexdigest()
 assert digest == '293b458eb7a2dda8f80c5e27bc81e73ef4018c0591abb114e5dde6816e149914', "live key is not the SageOS key"
+reg = pathlib.Path('/etc/containers/registries.d/ghcr.io-sageajnz-create-sageos.yaml').read_text()
+assert 'ghcr.io/sageajnz-create/sageos:' in reg and 'use-sigstore-attachments: true' in reg
 PY
 cmp "${BACKUP}/cosign.pub.candidate" "${KEY_PATH}"
-ok "live policy scope and exact key confirmed"
+cmp "${BACKUP}/registries.d.candidate" "${REGISTRIES_D_PATH}"
+ok "live policy scope, exact key, and registries.d confirmed"
 
 # --------------------------------------------------------------------------
 # 5. prove enforcement without touching the deployment
 # --------------------------------------------------------------------------
-say "Step 5: prove a signed pull is accepted under the live policy"
+say "Step 5: prove a signed pull is accepted under the live policy + registries.d"
 echo "  (downloads into an isolated /var/tmp dir; does not touch the deployment or podman storage)"
 DIGEST="$(skopeo inspect "docker://${IMAGE_REPO}:latest" | jq -er '.Digest | select(test("^sha256:[0-9a-f]{64}$"))')" \
     || die "could not resolve the published digest. Check network, then re-run or --undo."
@@ -248,9 +319,10 @@ cat << EOF
   Notes
    - The already-booted deployment is NOT retrospectively authenticated. This
      protects future pulls of ${IMAGE_REPO}.
+   - registries.d enables cosign .sig attachment lookup for this repo only.
    - "default" stays insecureAcceptAnything, so this does not yet satisfy
      bootc's --enforce-container-sigpolicy reject-default guard. That belongs
      in the image-side fix, not in a local repair.
-   - Negative tests (unsigned, wrong key, tampered image must all be REJECTED)
+   - Negative tests (unsigned and tampered images must all be REJECTED)
      belong on a clean unlayered QCOW2/VM, not on this machine.
 EOF
