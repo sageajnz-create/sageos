@@ -345,8 +345,10 @@ _build-bib $target_image $tag $type $config: (_rootful_load_image target_image t
     BUILDTMP=$(mktemp -p "${PWD}" -d -t _build-bib.XXXXXXXXXX)
     POLICY_FILE="${PWD}/system_files/etc/containers/policy.json"
     PUBLIC_KEY="${PWD}/system_files/etc/pki/containers/cosign.pub"
+    REGISTRIES_D_FILE="${PWD}/system_files/etc/containers/registries.d/ghcr.io-sageajnz-create-sageos.yaml"
     python3 -m json.tool "${POLICY_FILE}" >/dev/null
     test -s "${PUBLIC_KEY}"
+    test -s "${REGISTRIES_D_FILE}"
     BUILD_CONTAINER_ARGS=()
     if [[ "{{ type }}" != "iso" && "{{ type }}" != "anaconda-iso" ]]; then
       sudo podman pull "{{ bib_build_base }}"
@@ -370,6 +372,7 @@ _build-bib $target_image $tag $type $config: (_rootful_load_image target_image t
       -v /var/lib/containers/storage:/var/lib/containers/storage \
       -v "${POLICY_FILE}:/etc/containers/policy.json:ro" \
       -v "${PUBLIC_KEY}:/etc/pki/containers/cosign.pub:ro" \
+      -v "${REGISTRIES_D_FILE}:/etc/containers/registries.d/ghcr.io-sageajnz-create-sageos.yaml:ro" \
       "${bib_image}" \
       ${args} \
       "${BUILD_CONTAINER_ARGS[@]}" \
