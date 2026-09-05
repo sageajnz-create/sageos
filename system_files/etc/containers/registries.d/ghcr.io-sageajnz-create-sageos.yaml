@@ -1,0 +1,6 @@
+# SageOS: enable cosign sigstore attachment lookup for our image only.
+# Without this, containers/image ignores sha256-<digest>.sig tags on GHCR
+# and reports "no signature exists" under a sigstoreSigned policy.
+docker:
+  ghcr.io/sageajnz-create/sageos:
+    use-sigstore-attachments: true

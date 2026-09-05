@@ -9,6 +9,14 @@ Actions secret `SIGNING_SECRET`.
 The two committed public-key copies (`cosign.pub` and the image overlay copy)
 must remain byte-identical. `just validate` enforces this.
 
+Cosign publishes signatures as OCI tag attachments (`sha256-<digest>.sig`). The
+image also ships `/etc/containers/registries.d/ghcr.io-sageajnz-create-sageos.yaml`
+so containers/image looks up those attachments for `ghcr.io/sageajnz-create/sageos`
+only. Existing installs that predate that lookaside (or whose ostree `/etc` merge
+kept a stock `policy.json`) should use `scripts/repair-signature-policy.sh` on
+`main`, which installs the same trio: `cosign.pub`, SageOS-scoped
+`sigstoreSigned` `policy.json`, and the registries.d lookaside.
+
 ## Normal key rotation
 
 Because the current containers policy accepts one key, rotation requires a

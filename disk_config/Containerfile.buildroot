@@ -1,10 +1,11 @@
 # bootc-image-builder executes disk stages inside this build root. osbuild
 # replaces /etc with the build container, so this image must carry SageOS's
-# containers policy and Cosign public key as well as mkfs.btrfs.
+# containers policy, Cosign public key, and SageOS registries.d lookaside as well as mkfs.btrfs.
 FROM quay.io/fedora/fedora-bootc:42
 
 COPY system_files/etc/containers/policy.json /etc/containers/policy.json
 COPY system_files/etc/pki/containers/cosign.pub /etc/pki/containers/cosign.pub
+COPY system_files/etc/containers/registries.d/ghcr.io-sageajnz-create-sageos.yaml /etc/containers/registries.d/ghcr.io-sageajnz-create-sageos.yaml
 
 RUN dnf install -y btrfs-progs \
     && dnf clean all

@@ -42,12 +42,28 @@ done
 
 policy="${SYSTEM_ROOT}/etc/containers/policy.json"
 key="${SYSTEM_ROOT}/etc/pki/containers/cosign.pub"
+registries_d="${SYSTEM_ROOT}/etc/containers/registries.d/ghcr.io-sageajnz-create-sageos.yaml"
+expected_key_sha256="293b458eb7a2dda8f80c5e27bc81e73ef4018c0591abb114e5dde6816e149914"
 assert_file /etc/containers/policy.json
 assert_file /etc/pki/containers/cosign.pub
+assert_file /etc/containers/registries.d/ghcr.io-sageajnz-create-sageos.yaml
 [[ ! -e "${SYSTEM_ROOT}/usr/etc" ]] \
     || fail "container image must use /etc; /usr/etc is reserved for bootc internals"
 cmp -s "${REPO_ROOT}/cosign.pub" "${key}" \
     || fail "repository and image cosign public keys differ"
+# Offline structure test inspects system_files (the overlay source). build.sh
+# copies that tree onto the image root (`cp -avf /ctx/system_files/. /`), so
+# these paths become live /etc paths in the assembled image; validate-image.sh
+# asserts the assembled copy.
+assert_contains "${registries_d}" "ghcr.io/sageajnz-create/sageos:"
+assert_contains "${registries_d}" "use-sigstore-attachments: true"
+grep -Eq '^[[:space:]]*default-docker:' "${registries_d}" \
+    && fail "registries.d must not enable default-docker"
+grep -Eq '^[[:space:]]*ghcr\.io:' "${registries_d}" \
+    && fail "registries.d must not enable whole ghcr.io"
+key_sha256="$(sha256sum "${key}" | awk '{print $1}')"
+[[ "${key_sha256}" == "${expected_key_sha256}" ]] \
+    || fail "image cosign.pub sha256 is ${key_sha256}, expected ${expected_key_sha256}"
 python3 - "${policy}" "${key}" <<'PYEOF'
 import json
 import pathlib
@@ -89,4 +105,4 @@ for recipe in sageos-doctor sageos-version sageos-update sageos-rollback; do
     assert_contains "${just_recipes}" "${recipe}:"
 done
 
-echo "image structure PASS: executables, units, signing, Flatpaks, and ujust wiring"
+echo "image structure PASS: executables, units, signing trio, Flatpaks, and ujust wiring"

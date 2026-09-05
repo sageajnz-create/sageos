@@ -58,13 +58,17 @@ if grep -Fq 'tee /etc/containers/policy.json' "${build_disk}"; then
     fail "disk workflow overrides container policy outside the bootc image"
 fi
 # bootc-image-builder runs bootc inside its own container, so it needs the same
-# policy and public key mounted at the paths referenced by that policy. Keep the
-# workflow and local recipe aligned so both paths verify the source image.
+# policy, public key, and registries.d lookaside mounted at the paths referenced
+# by containers/image. Policy-only mounts are invalid: without registries.d,
+# cosign sha256-<digest>.sig attachments are ignored and signed pulls report
+# "no signature exists". Keep the workflow and local recipe aligned.
 for build_entrypoint in "${build_disk}" "${justfile}"; do
     grep -Fq '${POLICY_FILE}:/etc/containers/policy.json:ro' "${build_entrypoint}" \
         || fail "${build_entrypoint#"${repo_root}/"} does not mount the signature policy into the disk builder"
     grep -Fq '${PUBLIC_KEY}:/etc/pki/containers/cosign.pub:ro' "${build_entrypoint}" \
         || fail "${build_entrypoint#"${repo_root}/"} does not mount the signature key into the disk builder"
+    grep -Fq '${REGISTRIES_D_FILE}:/etc/containers/registries.d/ghcr.io-sageajnz-create-sageos.yaml:ro' "${build_entrypoint}" \
+        || fail "${build_entrypoint#"${repo_root}/"} does not mount registries.d into the disk builder"
 done
 if grep -Fq 'osbuild/bootc-image-builder-action@' "${build_disk}"; then
     fail "disk workflow uses the action that cannot mount the signature policy"
@@ -92,6 +96,8 @@ grep -Fq 'COPY system_files/etc/containers/policy.json /etc/containers/policy.js
     || fail "QCOW2 build root does not include the SageOS signature policy"
 grep -Fq 'COPY system_files/etc/pki/containers/cosign.pub /etc/pki/containers/cosign.pub' "${buildroot}" \
     || fail "QCOW2 build root does not include the Cosign public key"
+grep -Fq 'COPY system_files/etc/containers/registries.d/ghcr.io-sageajnz-create-sageos.yaml /etc/containers/registries.d/ghcr.io-sageajnz-create-sageos.yaml' "${buildroot}" \
+    || fail "QCOW2 build root does not include the SageOS registries.d lookaside"
 grep -Fq -- '--file disk_config/Containerfile.buildroot' "${build_disk}" \
     && grep -A2 -- '--file disk_config/Containerfile.buildroot' "${build_disk}" | grep -Eq '^[[:space:]]+\.$' \
     || fail "disk workflow does not build the nested root from the repository root"
