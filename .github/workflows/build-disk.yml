@@ -131,11 +131,18 @@ jobs:
             | sudo tee /etc/containers/storage.conf >/dev/null
 
           mkdir -p output
-          sudo podman pull "${BIB_IMAGE}"
-          sudo podman pull "${IMAGE_REF}"
+          # Overnight run 34988814241 died with podman 125 while pulling
+          # quay.io/fedora/fedora-bootc:42 (HTTP 502). The SageOS image and BIB
+          # image had already pulled; wrap registry pulls so a quay blip is not
+          # a hard gate failure.
+          pull_image() {
+            scripts/retry.sh --attempts 5 --delay-seconds 15 -- sudo podman pull "$1"
+          }
+          pull_image "${BIB_IMAGE}"
+          pull_image "${IMAGE_REF}"
           BUILD_CONTAINER_ARGS=()
           if [[ "${DISK_TYPE}" == "qcow2" ]]; then
-            sudo podman pull "${BIB_BUILD_BASE}"
+            pull_image "${BIB_BUILD_BASE}"
             sudo podman build \
               --pull=never \
               --tag "${BIB_BUILD_IMAGE}" \

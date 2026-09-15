@@ -87,6 +87,13 @@ grep -Fq 'BUILD_CONTAINER_ARGS=(--build-container "{{ bib_build_image }}")' "${j
     || fail "local disk builds do not use the clean nested build root"
 grep -Fq 'if [[ "${DISK_TYPE}" == "qcow2" ]]' "${build_disk}" \
     || fail "clean build root is not scoped to QCOW2"
+# Registry 5xx (notably quay.io 502) returns podman 125. Overnight disk CI must
+# retry pulls instead of failing the QCOW2 gate on the first blip.
+grep -Fq 'scripts/retry.sh --attempts 5 --delay-seconds 15 -- sudo podman pull "$1"' "${build_disk}" \
+    || fail "disk workflow does not retry registry pulls"
+if grep -Eq '^[[:space:]]+sudo podman pull ' "${build_disk}"; then
+    fail "disk workflow still pulls images without retry"
+fi
 buildroot="${repo_root}/disk_config/Containerfile.buildroot"
 grep -Fq 'FROM quay.io/fedora/fedora-bootc:42' "${buildroot}" \
     || fail "QCOW2 build root does not match the Bazzite Fedora generation"
